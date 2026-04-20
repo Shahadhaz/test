@@ -29,7 +29,8 @@
             #main-content { margin: 0 !important; width: 100% !important; background: white !important; }
             .card { background: white !important; box-shadow: none !important; border: 1px solid #e5e7eb !important; page-break-inside: avoid; margin-bottom: 20px;}
             canvas { max-width: 100% !important; height: auto !important; }
-            #print-logo { display: block !important; max-width: 150px !important; }
+            /* تم تكبير مقاس الشعار في الطباعة لـ 300 بكسل */
+            #print-logo { display: block !important; max-width: 300px !important; height: auto !important; }
             .dark-text-reset { color: #1f2937 !important; }
             .edit-icon { display: none !important; }
             input { border: none !important; background: transparent !important; color: black !important; }
@@ -40,7 +41,7 @@
 
     <div id="auth-screen" class="fixed inset-0 bg-gray-100 dark:bg-gray-900 z-50 flex items-center justify-center p-4">
         <div class="card w-full max-w-md text-center">
-            <img src="logo.png" alt="الشعار" class="w-24 h-24 object-contain mx-auto mb-4" onerror="this.src='https://via.placeholder.com/450x450.png?text=الشعار'">
+            <img src="logo.png" alt="الشعار" class="w-48 h-48 md:w-64 md:h-64 object-contain mx-auto mb-6" onerror="this.src='https://via.placeholder.com/250x250.png?text=الشعار'">
             <h1 class="text-2xl font-bold text-blue-900 dark:text-blue-400 mb-6">تسجيل الدخول للنظام</h1>
             
             <input type="email" id="email-input" placeholder="البريد الإلكتروني" class="w-full mb-4 px-4 py-3 rounded border dark:bg-gray-800 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left" dir="ltr">
@@ -62,7 +63,7 @@
         <aside id="sidebar" class="w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full shadow-lg z-10 no-print transition-colors">
             <div class="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col items-center relative">
                 <button onclick="logout()" class="absolute top-4 right-4 text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400">تسجيل خروج</button>
-                <img src="logo.png" alt="الشعار" class="w-20 h-20 object-contain mb-2 mt-4" onerror="this.src='https://via.placeholder.com/150x150.png?text=الشعار'">
+                <img src="logo.png" alt="الشعار" class="w-40 h-40 md:w-48 md:h-48 object-contain mb-4 mt-6" onerror="this.src='https://via.placeholder.com/200x200.png?text=الشعار'">
                 <h2 class="text-lg font-bold text-blue-900 dark:text-blue-400 text-center">النظام السحابي للتحليل</h2>
                 <div id="admin-badge" class="hidden mt-1 px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 text-[10px] rounded font-bold">صلاحية المشرف العام</div>
                 
@@ -134,7 +135,7 @@
                             🖨️ طباعة التقرير
                         </button>
                     </div>
-                    <img src="logo.png" id="print-logo" alt="الشعار" class="hidden w-32 h-32 object-contain" onerror="this.src='https://via.placeholder.com/150x150.png?text=الشعار'">
+                    <img src="logo.png" id="print-logo" alt="الشعار" class="hidden w-48 h-48 md:w-64 md:h-64 object-contain" onerror="this.src='https://via.placeholder.com/250x250.png?text=الشعار'">
                 </header>
 
                 <h2 id="sheet-title" class="text-2xl font-bold mb-4 text-blue-800 dark:text-blue-300 dark-text-reset border-r-4 border-blue-600 pr-2"></h2>
@@ -180,11 +181,10 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-        // إعدادات الترتيب الثابت للتقديرات (لحل مشكلة العشوائية)
         const GRADES_ORDER = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'راسب'];
         
         // إعداد إيميل المشرف العام (يمكنك إضافة أكثر من إيميل إذا أردت)
-        const ADMIN_EMAILS = ["jazan.hti@gmail.com"]; 
+        const ADMIN_EMAILS = ["admin@admin.com"]; 
         let isCurrentUserAdmin = false;
 
         const firebaseConfig = {
@@ -250,7 +250,6 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
-                // التحقق مما إذا كان المستخدم مديراً
                 isCurrentUserAdmin = ADMIN_EMAILS.includes(currentUser.email);
                 
                 if(isCurrentUserAdmin) {
@@ -277,7 +276,6 @@
             
             try {
                 let q;
-                // إذا كان المستخدم مديراً، اسحب كل التقارير. وإلا، اسحب تقاريره فقط.
                 if (isCurrentUserAdmin) {
                     q = query(collection(db, "reports"));
                 } else {
@@ -293,7 +291,6 @@
                     sheetsData.push(data);
                 });
                 
-                // الترتيب من الأحدث للأقدم
                 sheetsData.sort((a,b) => b.timestamp - a.timestamp);
                 
                 document.getElementById('loading-archive').classList.add('hidden');
@@ -315,7 +312,7 @@
             
             try {
                 processedData.userId = currentUser.uid;
-                processedData.userEmail = currentUser.email; // حفظ إيميل الرافع لكي يراه المشرف
+                processedData.userEmail = currentUser.email; 
                 processedData.timestamp = Date.now();
                 
                 const docRef = await addDoc(collection(db, "reports"), processedData);
@@ -514,7 +511,6 @@
             const passed = students.filter(g => g >= 60).length;
             const failed = count - passed;
 
-            // بناء الكائن بطريقة تضمن حصر الأعداد بناء على درجات الطالبات
             let gradesCount = { 'ممتاز': 0, 'جيد جدا': 0, 'جيد': 0, 'مقبول': 0, 'راسب': 0 };
             students.forEach(g => {
                 if (g >= 90) gradesCount['ممتاز']++;
@@ -561,7 +557,6 @@
 
             const badgesContainer = document.getElementById('grades-badges');
             badgesContainer.innerHTML = '';
-            
             const colors = { 
                 'ممتاز': 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-300', 
                 'جيد جدا': 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 border-cyan-300', 
@@ -570,7 +565,6 @@
                 'راسب': 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-300' 
             };
             
-            // استخدام الترتيب الإجباري (GRADES_ORDER) لضمان عدم العشوائية في البطاقات
             GRADES_ORDER.forEach(grade => {
                 const count = data.gradesCount[grade] || 0;
                 badgesContainer.innerHTML += `<div class="px-3 py-1 rounded-full border text-sm font-bold ${colors[grade]}">${grade}: ${formatTraineeCount(count)}</div>`;
@@ -613,7 +607,6 @@
                 const btn = document.createElement('button');
                 btn.className = `flex-1 text-right p-3 rounded border transition-all ${isActive ? activeClass : inactiveClass}`;
                 
-                // إضافة إيميل المدربة للمدير ليتمكن من معرفة صاحبة التقرير
                 let uploaderInfo = '';
                 if(isCurrentUserAdmin && sheet.userEmail) {
                     uploaderInfo = `<div class="text-[10px] text-purple-600 dark:text-purple-400 font-bold mt-1">بواسطة: ${sheet.userEmail}</div>`;
@@ -655,16 +648,12 @@
                 options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, animation: false }
             });
 
-            // استخدام الترتيب الإجباري (GRADES_ORDER) لضمان الترتيب في الرسم البياني
             const distData = GRADES_ORDER.map(grade => data.gradesCount[grade] || 0);
             
             if(distChart) distChart.destroy();
             distChart = new Chart(document.getElementById('gradesDistributionChart'), {
                 type: 'bar',
-                data: { 
-                    labels: GRADES_ORDER, 
-                    datasets: [{ label: 'العدد', data: distData, backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] 
-                },
+                data: { labels: GRADES_ORDER, datasets: [{ label: 'العدد', data: distData, backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] },
                 options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins:{legend:{display:false}}, animation: false }
             });
 
