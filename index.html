@@ -13,6 +13,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         body { font-family: 'Tajawal', sans-serif; transition: background-color 0.3s, color 0.3s; }
@@ -23,23 +24,44 @@
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;}
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* الكود الحاسم لحل مشكلة الطباعة (طباعة صفحات متعددة براحة تامة) */
         @media print {
-            .no-print, #sidebar { display: none !important; }
-            html, body { background-color: white !important; color: black !important; display: block !important; }
-            #main-content { margin: 0 !important; width: 100% !important; background: white !important; }
-            .card { background: white !important; box-shadow: none !important; border: 1px solid #e5e7eb !important; page-break-inside: avoid; margin-bottom: 20px;}
-            canvas { max-width: 100% !important; height: auto !important; }
-            /* تم تكبير مقاس الشعار في الطباعة لـ 300 بكسل */
-            #print-logo { display: block !important; max-width: 300px !important; height: auto !important; }
+            @page { size: A4 portrait; margin: 10mm; }
+            * { overflow: visible !important; box-shadow: none !important; }
+            html, body { height: auto !important; min-height: auto !important; display: block !important; background-color: white !important; color: black !important; }
+            
+            #app-container, #main-content, #dashboard { 
+                height: auto !important; 
+                display: block !important; 
+                position: static !important; 
+                width: 100% !important; 
+                margin: 0 !important; 
+                padding: 0 !important; 
+            }
+            
+            .no-print, #sidebar, #mobile-overlay, #export-buttons, #mobile-menu-btn, #auth-screen { display: none !important; }
+            
+            .card { 
+                page-break-inside: avoid !important; 
+                break-inside: avoid !important; 
+                background: white !important; 
+                border: 1px solid #e5e7eb !important; 
+                margin-bottom: 20px !important; 
+            }
+            
+            canvas { max-width: 100% !important; height: auto !important; page-break-inside: avoid !important; }
+            .overflow-x-auto { overflow: visible !important; }
+            
+            #print-logo { display: block !important; max-width: 280px !important; height: auto !important; margin: 0 auto 30px auto !important;}
             .dark-text-reset { color: #1f2937 !important; }
             .edit-icon { display: none !important; }
-            input { border: none !important; background: transparent !important; color: black !important; }
+            input { border: none !important; background: transparent !important; color: black !important; padding: 0 !important; }
         }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100">
 
-    <div id="auth-screen" class="fixed inset-0 bg-gray-100 dark:bg-gray-900 z-50 flex items-center justify-center p-4">
+    <div id="auth-screen" class="fixed inset-0 bg-gray-100 dark:bg-gray-900 z-[60] flex items-center justify-center p-4">
         <div class="card w-full max-w-md text-center">
             <img src="logo.png" alt="الشعار" class="w-48 h-48 md:w-64 md:h-64 object-contain mx-auto mb-6" onerror="this.src='https://via.placeholder.com/250x250.png?text=الشعار'">
             <h1 class="text-2xl font-bold text-blue-900 dark:text-blue-400 mb-6">تسجيل الدخول للنظام</h1>
@@ -57,10 +79,14 @@
         </div>
     </div>
 
-    <div id="app-container" class="flex w-full h-full hidden">
+    <div id="app-container" class="flex w-full h-full hidden relative">
         <input type="file" id="global-file-upload" accept=".xlsx, .xls, .csv" class="hidden"/>
 
-        <aside id="sidebar" class="w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full shadow-lg z-10 no-print transition-colors">
+        <div id="mobile-overlay" class="fixed inset-0 bg-gray-900/60 z-40 hidden md:hidden backdrop-blur-sm transition-opacity" onclick="toggleSidebar()"></div>
+
+        <aside id="sidebar" class="fixed inset-y-0 right-0 z-50 transform translate-x-full md:translate-x-0 md:relative w-80 transition-transform duration-300 ease-in-out bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full shadow-2xl md:shadow-lg no-print">
+            <button onclick="toggleSidebar()" class="md:hidden absolute top-4 left-4 w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-300 hover:bg-red-100 hover:text-red-600 transition shadow-sm border border-gray-200 dark:border-gray-600 z-50">✕</button>
+            
             <div class="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col items-center relative">
                 <button onclick="logout()" class="absolute top-4 right-4 text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400">تسجيل خروج</button>
                 <img src="logo.png" alt="الشعار" class="w-40 h-40 md:w-48 md:h-48 object-contain mb-4 mt-6" onerror="this.src='https://via.placeholder.com/200x200.png?text=الشعار'">
@@ -95,14 +121,18 @@
 
             <div class="p-4 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-2">
                 <button id="delete-selected-btn" onclick="deleteSelected()" class="hidden w-full text-orange-600 dark:text-orange-400 font-bold py-2 px-4 rounded border border-orange-200 dark:border-orange-900/50 hover:bg-orange-50 transition text-sm">
-                    🗑️ حذف المحدد من السحابة
+                    🗑️ حذف المحدد
                 </button>
             </div>
         </aside>
 
-        <main id="main-content" class="flex-1 h-full overflow-y-auto relative p-4 md:p-8 transition-colors">
+        <main id="main-content" class="flex-1 h-full overflow-y-auto relative p-4 md:p-8 transition-colors w-full">
             
-            <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center">
+            <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center relative p-4">
+                <button onclick="toggleSidebar()" class="absolute top-4 right-4 md:hidden flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-blue-700 dark:text-blue-400 px-4 py-2 rounded shadow-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                    ☰ القائمة الجانبية
+                </button>
+                
                 <div class="text-6xl mb-4">☁️</div>
                 <h1 class="text-3xl font-bold text-blue-900 dark:text-blue-400 mb-2">النظام متصل بالسحابة بنجاح</h1>
                 <p class="text-gray-500 dark:text-gray-400 mb-8 max-w-md">جميع بياناتك محفوظة الآن بأمان في خوادم Google Firebase ولن تفقدها أبداً.</p>
@@ -112,9 +142,20 @@
             </div>
 
             <div id="dashboard" class="hidden">
-                <header class="flex justify-between items-start mb-6 border-b pb-6 border-gray-300 dark:border-gray-700">
-                    <div class="flex-1">
-                        <h1 class="text-3xl font-bold text-blue-900 dark:text-blue-400 dark-text-reset mb-4">تقرير الأداء ونواتج التعلم</h1>
+                
+                <div class="w-full flex justify-center mb-6">
+                    <img src="logo.png" id="print-logo" alt="الشعار" class="hidden w-48 h-48 md:w-64 md:h-64 object-contain" onerror="this.src='https://via.placeholder.com/300x150.png?text=الشعار'">
+                </div>
+
+                <header class="flex flex-col xl:flex-row justify-between items-start mb-6 border-b pb-6 border-gray-300 dark:border-gray-700 gap-4">
+                    <div class="flex-1 w-full">
+                        <div class="flex items-center gap-3 mb-4" id="mobile-menu-btn">
+                            <button onclick="toggleSidebar()" class="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded shadow-sm font-bold text-sm hover:bg-blue-100 dark:hover:bg-blue-900/50 transition">
+                                ☰ الأرشيف
+                            </button>
+                            <h1 class="text-2xl md:text-3xl font-bold text-blue-900 dark:text-blue-400 dark-text-reset truncate">تقرير الأداء ونواتج التعلم</h1>
+                        </div>
+                        
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
                             <div class="flex items-center gap-2 group">
                                 <span class="text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">المقرر:</span>
@@ -130,17 +171,23 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex flex-col items-end gap-4 no-print ml-4">
-                        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow transition-all whitespace-nowrap">
-                            🖨️ طباعة التقرير
+                    
+                    <div id="export-buttons" class="flex flex-col sm:flex-row items-stretch gap-2 w-full xl:w-auto mt-2">
+                        <button onclick="window.print()" class="bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
+                            🖨️ طباعة (متعدد الصفحات)
+                        </button>
+                        <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
+                            📄 تصدير PDF
+                        </button>
+                        <button onclick="exportInteractiveHTML()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
+                            🌐 تصدير ملف تفاعلي
                         </button>
                     </div>
-                    <img src="logo.png" id="print-logo" alt="الشعار" class="hidden w-48 h-48 md:w-64 md:h-64 object-contain" onerror="this.src='https://via.placeholder.com/250x250.png?text=الشعار'">
                 </header>
 
-                <h2 id="sheet-title" class="text-2xl font-bold mb-4 text-blue-800 dark:text-blue-300 dark-text-reset border-r-4 border-blue-600 pr-2"></h2>
+                <h2 id="sheet-title" class="text-xl md:text-2xl font-bold mb-4 text-blue-800 dark:text-blue-300 dark-text-reset border-r-4 border-blue-600 pr-2"></h2>
 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 text-center">
+                <div id="stats-section" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 text-center">
                     <div class="card !bg-blue-50 dark:!bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">الإجمالي</h3><p id="total-students" class="text-2xl font-bold text-blue-700 dark:text-blue-400">0</p></div>
                     <div class="card !bg-green-50 dark:!bg-green-900/20 border border-green-100 dark:border-green-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">المتوسط</h3><p id="mean-score" class="text-2xl font-bold text-green-700 dark:text-green-400">0</p></div>
                     <div class="card !bg-purple-50 dark:!bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">الوسيط</h3><p id="median-score" class="text-2xl font-bold text-purple-700 dark:text-purple-400">0</p></div>
@@ -152,11 +199,11 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     <div class="card flex flex-col justify-center items-center">
                         <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4">معدل الاجتياز</h3>
-                        <div class="relative w-48 h-48"><canvas id="passRateChart"></canvas></div>
+                        <div class="relative w-full max-w-[200px] aspect-square"><canvas id="passRateChart"></canvas></div>
                     </div>
                     <div class="card lg:col-span-2">
                         <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4">توزيع التقديرات المستحقة</h3>
-                        <canvas id="gradesDistributionChart" style="max-height: 250px;"></canvas>
+                        <div class="w-full overflow-x-auto"><canvas id="gradesDistributionChart" style="max-height: 250px; min-width: 400px;"></canvas></div>
                         <div id="grades-badges" class="flex flex-wrap justify-center gap-2 mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"></div>
                     </div>
                 </div>
@@ -164,12 +211,12 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div class="card">
                         <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4 text-center">متوسط الأداء في بنود التقييم</h3>
-                        <canvas id="assessmentRadarChart"></canvas>
+                        <div class="w-full overflow-x-auto"><canvas id="assessmentRadarChart" style="min-width: 300px;"></canvas></div>
                     </div>
                     <div class="card">
                         <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-1 text-center">علاقة الحضور بالدرجة النهائية</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-4 no-print">كل نقطة تمثل متدربة (مرر الماوس لرؤية الاسم)</p>
-                        <canvas id="correlationChart"></canvas>
+                        <p id="scatter-hint" class="text-xs text-gray-500 dark:text-gray-400 text-center mb-4 no-print">كل نقطة تمثل متدربة (مرر الماوس لرؤية الاسم)</p>
+                        <div class="w-full overflow-x-auto"><canvas id="correlationChart" style="min-width: 300px;"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -182,7 +229,6 @@
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
         const GRADES_ORDER = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'راسب'];
-        
         const ADMIN_EMAILS = ["jazan.hti@gmail.com"]; 
         let isCurrentUserAdmin = false;
 
@@ -204,6 +250,28 @@
         let sheetsData = []; 
         let currentRecordIndex = -1;
         let passChart, distChart, radarChart, corrChart;
+
+        // دالة الفتح والإغلاق الموحدة (جوال وكمبيوتر)
+        window.toggleSidebar = function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            
+            if (window.innerWidth >= 768) {
+                // للكمبيوتر
+                sidebar.classList.toggle('md:hidden');
+            } else {
+                // للجوال
+                if (sidebar.classList.contains('translate-x-full')) {
+                    sidebar.classList.remove('translate-x-full');
+                    sidebar.classList.add('translate-x-0');
+                    overlay.classList.remove('hidden');
+                } else {
+                    sidebar.classList.add('translate-x-full');
+                    sidebar.classList.remove('translate-x-0');
+                    overlay.classList.add('hidden');
+                }
+            }
+        }
 
         window.toggleTheme = function() {
             const html = document.documentElement;
@@ -251,11 +319,8 @@
                 currentUser = user;
                 isCurrentUserAdmin = ADMIN_EMAILS.includes(currentUser.email);
                 
-                if(isCurrentUserAdmin) {
-                    document.getElementById('admin-badge').classList.remove('hidden');
-                } else {
-                    document.getElementById('admin-badge').classList.add('hidden');
-                }
+                if(isCurrentUserAdmin) document.getElementById('admin-badge').classList.remove('hidden');
+                else document.getElementById('admin-badge').classList.add('hidden');
 
                 authScreen.classList.add('hidden');
                 appContainer.classList.remove('hidden');
@@ -275,11 +340,8 @@
             
             try {
                 let q;
-                if (isCurrentUserAdmin) {
-                    q = query(collection(db, "reports"));
-                } else {
-                    q = query(collection(db, "reports"), where("userId", "==", currentUser.uid));
-                }
+                if (isCurrentUserAdmin) q = query(collection(db, "reports"));
+                else q = query(collection(db, "reports"), where("userId", "==", currentUser.uid));
                 
                 const querySnapshot = await getDocs(q);
                 
@@ -570,6 +632,15 @@
             });
 
             drawCharts(data);
+            
+            // إغلاق القائمة الجانبية تلقائياً في الجوال بعد اختيار التقرير لراحة المستخدم
+            if(window.innerWidth < 768) {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('mobile-overlay');
+                sidebar.classList.add('translate-x-full');
+                sidebar.classList.remove('translate-x-0');
+                overlay.classList.add('hidden');
+            }
         }
 
         function renderArchiveList(searchQuery = '') {
@@ -644,7 +715,7 @@
             passChart = new Chart(document.getElementById('passRateChart'), {
                 type: 'doughnut',
                 data: { labels: ['مجتاز', 'لم يجتز'], datasets: [{ data: [data.passed, data.failed], backgroundColor: ['#10B981', '#EF4444'], borderColor: isDark ? '#1f2937' : '#ffffff' }] },
-                options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, animation: false }
+                options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, animation: false, maintainAspectRatio: false }
             });
 
             const distData = GRADES_ORDER.map(grade => data.gradesCount[grade] || 0);
@@ -669,6 +740,186 @@
                 data: { datasets: [{ label: 'المتدربات', data: data.scatterData, backgroundColor: '#EC4899', pointRadius: 6, pointHoverRadius: 8 }] },
                 options: { scales: { x: { title: { display: true, text: 'الحضور (من 10)', color: textColor }, min: 0, max: 11, ticks: {color: textColor}, grid: {color: gridColor} }, y: { title: { display: true, text: 'النهائي (من 100)', color: textColor }, min: 0, max: 105, ticks: {color: textColor}, grid: {color: gridColor} } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { const p = ctx.raw; return `${p.studentName} | حضور: ${p.x}، نهائي: ${p.y}`; } } } }, animation: false }
             });
+        }
+
+        // ============================================
+        // 1. التصدير كملف PDF باحترافية
+        // ============================================
+        window.exportToPDF = function() {
+            const element = document.getElementById('dashboard');
+            const exportBtns = document.getElementById('export-buttons');
+            const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+            const printLogo = document.getElementById('print-logo');
+            const hint = document.getElementById('scatter-hint');
+            const mainContent = document.getElementById('main-content');
+            
+            exportBtns.style.display = 'none';
+            if(mobileMenuBtn) mobileMenuBtn.style.display = 'none';
+            if(hint) hint.style.display = 'none';
+            printLogo.classList.remove('hidden');
+            printLogo.classList.add('block');
+            
+            const originalOverflow = mainContent.style.overflow;
+            const originalHeight = mainContent.style.height;
+            mainContent.style.overflow = 'visible';
+            mainContent.style.height = 'auto';
+
+            const data = sheetsData[currentRecordIndex];
+            const safeFileName = `تقرير_${data.courseName}_${data.sheetName}`.replace(/[\/\?<>\\:\*\|":]/g, '_');
+            
+            const opt = {
+                margin:       [0.4, 0.4, 0.4, 0.4],
+                filename:     `${safeFileName}.pdf`,
+                image:        { type: 'jpeg', quality: 1 },
+                html2canvas:  { scale: 2, useCORS: true, allowTaint: true, scrollY: 0 },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            setTimeout(() => {
+                html2pdf().set(opt).from(element).save().then(() => {
+                    restoreUI();
+                }).catch(err => {
+                    console.error('PDF Error:', err);
+                    restoreUI();
+                });
+            }, 300);
+
+            function restoreUI() {
+                exportBtns.style.display = '';
+                if(mobileMenuBtn) mobileMenuBtn.style.display = '';
+                if(hint) hint.style.display = '';
+                printLogo.classList.remove('block');
+                printLogo.classList.add('hidden');
+                mainContent.style.overflow = originalOverflow;
+                mainContent.style.height = originalHeight;
+            }
+        }
+
+        // ============================================
+        // 2. التصدير كملف تفاعلي HTML
+        // ============================================
+        window.exportInteractiveHTML = function() {
+            const data = sheetsData[currentRecordIndex];
+            const isDark = document.documentElement.classList.contains('dark');
+            const themeClass = isDark ? 'dark' : 'light';
+            const bgClass = isDark ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-800';
+
+            const statsHtml = document.getElementById('stats-section').outerHTML;
+            const badgesHtml = document.getElementById('grades-badges').innerHTML;
+            const logoSrc = document.getElementById('print-logo').src;
+
+            const htmlContent = `<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="${themeClass}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير تفاعلي - ${data.sheetName}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <script>tailwind.config = { darkMode: 'class' }<\/script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Tajawal', sans-serif; }
+        .card { border-radius: 0.5rem; padding: 1.5rem; }
+        .light .card { background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .dark .card { background: #1f2937; border: 1px solid #374151; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body class="${bgClass} p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b pb-6 border-gray-300 dark:border-gray-700 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-900 dark:text-blue-400 mb-2">تقرير الأداء ونواتج التعلم</h1>
+                <div class="flex flex-wrap gap-4 text-gray-600 dark:text-gray-400 font-bold mt-4">
+                    <span>المقرر: ${data.courseName}</span>
+                    <span>المدربة: ${data.trainerName}</span>
+                    <span>الشعبة: ${data.section}</span>
+                </div>
+            </div>
+            <img src="${logoSrc}" class="w-32 h-32 md:w-48 md:h-48 object-contain" onerror="this.style.display='none'">
+        </header>
+
+        <h2 class="text-2xl font-bold mb-4 text-blue-800 dark:text-blue-300 border-r-4 border-blue-600 pr-2">تحليل بيانات: ${data.sheetName}</h2>
+
+        ${statsHtml}
+
+        <h2 class="text-xl font-bold mb-4 text-blue-800 dark:text-blue-300 border-r-4 border-blue-600 pr-2 mt-8">تحليل نواتج التعلم ومستويات المتدربات</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div class="card flex flex-col justify-center items-center">
+                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">معدل الاجتياز</h3>
+                <div class="relative w-full max-w-[200px] aspect-square"><canvas id="passRateChart"></canvas></div>
+            </div>
+            <div class="card lg:col-span-2">
+                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">توزيع التقديرات المستحقة</h3>
+                <div class="w-full overflow-x-auto"><canvas id="gradesDistributionChart" style="max-height: 250px; min-width: 400px;"></canvas></div>
+                <div class="flex flex-wrap justify-center gap-2 mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                   ${badgesHtml}
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="card">
+                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 text-center">متوسط الأداء في بنود التقييم</h3>
+                <div class="w-full overflow-x-auto"><canvas id="assessmentRadarChart" style="min-width: 300px;"></canvas></div>
+            </div>
+            <div class="card">
+                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1 text-center">علاقة الحضور بالدرجة النهائية</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-4">كل نقطة تمثل متدربة (مرر الماوس لرؤية الاسم)</p>
+                <div class="w-full overflow-x-auto"><canvas id="correlationChart" style="min-width: 300px;"></canvas></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const data = ${JSON.stringify(data)};
+        const GRADES_ORDER = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'راسب'];
+        
+        Chart.defaults.font.family = "'Tajawal', sans-serif";
+        const isDark = ${isDark};
+        const textColor = isDark ? '#D1D5DB' : '#374151'; 
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        Chart.defaults.color = textColor;
+        Chart.defaults.scale.grid.color = gridColor;
+
+        new Chart(document.getElementById('passRateChart'), {
+            type: 'doughnut',
+            data: { labels: ['مجتاز', 'لم يجتز'], datasets: [{ data: [data.passed, data.failed], backgroundColor: ['#10B981', '#EF4444'], borderColor: isDark ? '#1f2937' : '#ffffff' }] },
+            options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, maintainAspectRatio: false }
+        });
+
+        const distData = GRADES_ORDER.map(grade => data.gradesCount[grade] || 0);
+        new Chart(document.getElementById('gradesDistributionChart'), {
+            type: 'bar',
+            data: { labels: GRADES_ORDER, datasets: [{ label: 'العدد', data: distData, backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] },
+            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins:{legend:{display:false}} }
+        });
+
+        new Chart(document.getElementById('assessmentRadarChart'), {
+            type: 'bar',
+            data: { labels: ['الحضور', 'المشاركة', 'الواجبات', 'الاختبار القصير', 'الاختبار النهائي'], datasets: [{ label: 'متوسط الأداء (من 100%)', data: data.avgData, backgroundColor: '#8B5CF6', borderRadius: 4 }] },
+            options: { scales: { y: { beginAtZero: true, max: 100, ticks: {color: textColor}, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins: { tooltip: { callbacks: { label: function(c) { return c.raw.toFixed(1) + '%'; } } } } }
+        });
+
+        new Chart(document.getElementById('correlationChart'), {
+            type: 'scatter',
+            data: { datasets: [{ label: 'المتدربات', data: data.scatterData, backgroundColor: '#EC4899', pointRadius: 6, pointHoverRadius: 8 }] },
+            options: { scales: { x: { title: { display: true, text: 'الحضور (من 10)', color: textColor }, min: 0, max: 11, ticks: {color: textColor}, grid: {color: gridColor} }, y: { title: { display: true, text: 'النهائي (من 100)', color: textColor }, min: 0, max: 105, ticks: {color: textColor}, grid: {color: gridColor} } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { const p = ctx.raw; return \`\${p.studentName} | حضور: \${p.x}، نهائي: \${p.y}\`; } } } } }
+        });
+    <\/script>
+</body>
+</html>`;
+
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const safeFileName = `تقرير_${data.courseName}_${data.sheetName}`.replace(/[\/\?<>\\:\*\|":]/g, '_');
+            a.download = `${safeFileName}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>
