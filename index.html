@@ -20,7 +20,6 @@
         .light .card { background: white; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
         .dark .card { background: #1f2937; border: 1px solid #374151; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); }
         
-        /* تأثير التحميل (Loader) */
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;}
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -65,6 +64,7 @@
                 <button onclick="logout()" class="absolute top-4 right-4 text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400">تسجيل خروج</button>
                 <img src="logo.png" alt="الشعار" class="w-20 h-20 object-contain mb-2 mt-4" onerror="this.src='https://via.placeholder.com/150x150.png?text=الشعار'">
                 <h2 class="text-lg font-bold text-blue-900 dark:text-blue-400 text-center">النظام السحابي للتحليل</h2>
+                <div id="admin-badge" class="hidden mt-1 px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 text-[10px] rounded font-bold">صلاحية المشرف العام</div>
                 
                 <button onclick="toggleTheme()" class="mt-3 flex items-center justify-center gap-2 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-3 py-1 rounded-full hover:bg-gray-200 transition">
                     <span id="theme-icon">🌙 وضع داكن</span>
@@ -154,7 +154,7 @@
                         <div class="relative w-48 h-48"><canvas id="passRateChart"></canvas></div>
                     </div>
                     <div class="card lg:col-span-2">
-                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4">توزيع التقديرات</h3>
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4">توزيع التقديرات المستحقة</h3>
                         <canvas id="gradesDistributionChart" style="max-height: 250px;"></canvas>
                         <div id="grades-badges" class="flex flex-wrap justify-center gap-2 mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"></div>
                     </div>
@@ -162,12 +162,12 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div class="card">
-                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4 text-center">متوسط الأداء في التقييم</h3>
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4 text-center">متوسط الأداء في بنود التقييم</h3>
                         <canvas id="assessmentRadarChart"></canvas>
                     </div>
                     <div class="card">
                         <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-1 text-center">علاقة الحضور بالدرجة النهائية</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-4 no-print">כל نقطة تمثل متدربة (مرر الماوس لرؤية الاسم)</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-4 no-print">كل نقطة تمثل متدربة (مرر الماوس لرؤية الاسم)</p>
                         <canvas id="correlationChart"></canvas>
                     </div>
                 </div>
@@ -180,7 +180,13 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-        // إعدادات Firebase الخاصة بك
+        // إعدادات الترتيب الثابت للتقديرات (لحل مشكلة العشوائية)
+        const GRADES_ORDER = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'راسب'];
+        
+        // إعداد إيميل المشرف العام (يمكنك إضافة أكثر من إيميل إذا أردت)
+        const ADMIN_EMAILS = ["jazan.hti@gmail.com"]; 
+        let isCurrentUserAdmin = false;
+
         const firebaseConfig = {
             apiKey: "AIzaSyCm6BWAE6EAYA55_dKWTZYSsOyvRwbgepc",
             authDomain: "dataanalysis-144dc.firebaseapp.com",
@@ -195,13 +201,11 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // متغيرات النظام
         let currentUser = null;
         let sheetsData = []; 
         let currentRecordIndex = -1;
         let passChart, distChart, radarChart, corrChart;
 
-        // --- التحكم بالوضع الداكن ---
         window.toggleTheme = function() {
             const html = document.documentElement;
             html.classList.toggle('dark');
@@ -215,7 +219,6 @@
             document.getElementById('theme-icon').innerText = '☀️ وضع فاتح';
         }
 
-        // --- نظام تسجيل الدخول (Auth) ---
         const authScreen = document.getElementById('auth-screen');
         const appContainer = document.getElementById('app-container');
         const errorMsg = document.getElementById('auth-error');
@@ -236,7 +239,6 @@
                 if(action === 'login') await signInWithEmailAndPassword(auth, email, password);
                 else await createUserWithEmailAndPassword(auth, email, password);
             } catch (error) {
-                console.error(error);
                 errorMsg.innerText = "حدث خطأ: " + error.message;
                 errorMsg.classList.remove('hidden');
             }
@@ -248,35 +250,50 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
+                // التحقق مما إذا كان المستخدم مديراً
+                isCurrentUserAdmin = ADMIN_EMAILS.includes(currentUser.email);
+                
+                if(isCurrentUserAdmin) {
+                    document.getElementById('admin-badge').classList.remove('hidden');
+                } else {
+                    document.getElementById('admin-badge').classList.add('hidden');
+                }
+
                 authScreen.classList.add('hidden');
                 appContainer.classList.remove('hidden');
-                await loadDataFromCloud(); // جلب بيانات السحابة
+                await loadDataFromCloud();
             } else {
                 currentUser = null;
+                isCurrentUserAdmin = false;
                 sheetsData = [];
                 authScreen.classList.remove('hidden');
                 appContainer.classList.add('hidden');
             }
         });
 
-        // --- نظام قاعدة البيانات السحابية (Firestore) ---
         async function loadDataFromCloud() {
             document.getElementById('loading-archive').classList.remove('hidden');
             document.getElementById('archive-list').innerHTML = '';
             
             try {
-                // جلب التقارير الخاصة بالمستخدم الحالي فقط
-                const q = query(collection(db, "reports"), where("userId", "==", currentUser.uid));
+                let q;
+                // إذا كان المستخدم مديراً، اسحب كل التقارير. وإلا، اسحب تقاريره فقط.
+                if (isCurrentUserAdmin) {
+                    q = query(collection(db, "reports"));
+                } else {
+                    q = query(collection(db, "reports"), where("userId", "==", currentUser.uid));
+                }
+                
                 const querySnapshot = await getDocs(q);
                 
                 sheetsData = [];
                 querySnapshot.forEach((doc) => {
                     let data = doc.data();
-                    data.id = doc.id; // نحفظ الـ ID السحابي لنتمكن من مسحه لاحقاً
+                    data.id = doc.id; 
                     sheetsData.push(data);
                 });
                 
-                // ترتيب محلي (الأحدث أولاً)
+                // الترتيب من الأحدث للأقدم
                 sheetsData.sort((a,b) => b.timestamp - a.timestamp);
                 
                 document.getElementById('loading-archive').classList.add('hidden');
@@ -284,35 +301,41 @@
                 if(sheetsData.length > 0) viewRecord(0);
                 
             } catch (error) {
-                console.error("Error loading documents: ", error);
-                alert("حدث خطأ في جلب البيانات من السحابة.");
+                console.error("Error:", error);
+                alert("حدث خطأ في جلب البيانات.");
                 document.getElementById('loading-archive').classList.add('hidden');
             }
         }
 
         async function saveToCloud(processedData) {
-            document.getElementById('cloud-sync-icon').innerText = '⏳ جاري الحفظ...';
-            document.getElementById('cloud-sync-icon').classList.remove('hidden');
+            const syncIcon = document.getElementById('cloud-sync-icon');
+            syncIcon.innerText = '⏳ جاري الحفظ...';
+            syncIcon.classList.remove('hidden', 'text-red-500');
+            syncIcon.classList.add('text-green-500');
             
             try {
-                // ربط التقرير بالمستخدم الحالي
                 processedData.userId = currentUser.uid;
+                processedData.userEmail = currentUser.email; // حفظ إيميل الرافع لكي يراه المشرف
                 processedData.timestamp = Date.now();
                 
                 const docRef = await addDoc(collection(db, "reports"), processedData);
-                processedData.id = docRef.id; // حفظ الـ ID
+                processedData.id = docRef.id;
                 
                 sheetsData.unshift(processedData);
-                document.getElementById('cloud-sync-icon').innerText = '✅ تم الحفظ';
-                setTimeout(() => document.getElementById('cloud-sync-icon').classList.add('hidden'), 2000);
+                syncIcon.innerText = '✅ تم الحفظ';
+                setTimeout(() => syncIcon.classList.add('hidden'), 2000);
             } catch (error) {
                 console.error("Error adding document: ", error);
-                alert("فشل الحفظ في السحابة!");
+                syncIcon.classList.remove('text-green-500');
+                syncIcon.classList.add('text-red-500');
+                syncIcon.innerText = '❌ فشل الحفظ';
+                alert("تم رفض الحفظ من السحابة! \nتأكد من تفعيل Firestore ونشر قواعد الأمان (Rules).");
+                setTimeout(() => syncIcon.classList.add('hidden'), 4000);
             }
         }
 
         window.deleteSingle = async function(index) {
-            if(!confirm("هل أنت متأكد من الحذف النهائي من السحابة؟")) return;
+            if(!confirm("هل أنت متأكد من الحذف النهائي؟")) return;
             const docId = sheetsData[index].id;
             try {
                 await deleteDoc(doc(db, "reports", docId));
@@ -324,10 +347,11 @@
         window.deleteSelected = async function() {
             const checkboxes = document.querySelectorAll('.archive-cb:checked');
             if(checkboxes.length === 0) return;
-            if(!confirm(`هل أنت متأكد من حذف ${checkboxes.length} تقارير من السحابة نهائياً؟`)) return;
+            if(!confirm(`هل أنت متأكد من حذف ${checkboxes.length} تقارير من السحابة؟`)) return;
             
             document.getElementById('cloud-sync-icon').innerText = '⏳ جاري الحذف...';
-            document.getElementById('cloud-sync-icon').classList.remove('hidden');
+            document.getElementById('cloud-sync-icon').classList.remove('hidden', 'text-red-500');
+            document.getElementById('cloud-sync-icon').classList.add('text-green-500');
 
             const indices = Array.from(checkboxes).map(cb => parseInt(cb.value)).sort((a, b) => b - a);
             
@@ -354,8 +378,6 @@
                 await updateDoc(reportRef, { [field]: newVal });
             } catch (error) { console.error("Error updating", error); }
         }
-
-        // --- باقي وظائف الواجهة (الرفع، الخوارزمية، الرسم) ---
         
         function resetViewAfterDelete() {
             document.getElementById('search-input').value = '';
@@ -403,7 +425,7 @@
                         const processedData = processSheet(rawData, sheetName);
                         if(processedData) {
                             processedData.uploadDate = new Date().toLocaleDateString('ar-SA');
-                            await saveToCloud(processedData); // حفظ للسحابة فوراً
+                            await saveToCloud(processedData);
                             newProcessed++;
                         }
                     }
@@ -421,7 +443,6 @@
             reader.readAsArrayBuffer(file);
         });
 
-        // خوارزمية التحليل الذكية
         function processSheet(rows, sheetName) {
             let cols = { name: -1, final: -1, attendance: -1, participation: -1, homework: -1, quiz: -1, finalExam: -1 };
             let courseName = "غير محدد", trainerName = "غير محدد", section = "غير محدد";
@@ -463,7 +484,7 @@
                 if (!row || row.length < 2) continue;
                 
                 let name = String(row[cols.name] || "").trim();
-                if (!name || name.includes("اسم المتدربة") || name.includes("اسم الطالبة") || name.includes("المصححة")) continue;
+                if (!name || name.includes("اسم المتدربة") || name.includes("اسم الطالبة") || name.includes("المصححة") || name.includes("التوقيع")) continue;
                 
                 let finalScore = parseFloat(row[cols.final]);
                 if (isNaN(finalScore)) continue; 
@@ -493,6 +514,7 @@
             const passed = students.filter(g => g >= 60).length;
             const failed = count - passed;
 
+            // بناء الكائن بطريقة تضمن حصر الأعداد بناء على درجات الطالبات
             let gradesCount = { 'ممتاز': 0, 'جيد جدا': 0, 'جيد': 0, 'مقبول': 0, 'راسب': 0 };
             students.forEach(g => {
                 if (g >= 90) gradesCount['ممتاز']++;
@@ -510,7 +532,6 @@
             return { sheetName, courseName, trainerName, section, count, max, min, mean, median, stdDev, passed, failed, gradesCount, avgData, scatterData };
         }
 
-        // واجهة المستخدم (الرسم والقوائم)
         function formatTraineeCount(count) {
             if (count === 0) return "0 متدربة";
             if (count === 1) return "متدربة واحدة";
@@ -540,6 +561,7 @@
 
             const badgesContainer = document.getElementById('grades-badges');
             badgesContainer.innerHTML = '';
+            
             const colors = { 
                 'ممتاز': 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-300', 
                 'جيد جدا': 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 border-cyan-300', 
@@ -547,9 +569,13 @@
                 'مقبول': 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-300', 
                 'راسب': 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-300' 
             };
-            for (const [grade, count] of Object.entries(data.gradesCount)) {
+            
+            // استخدام الترتيب الإجباري (GRADES_ORDER) لضمان عدم العشوائية في البطاقات
+            GRADES_ORDER.forEach(grade => {
+                const count = data.gradesCount[grade] || 0;
                 badgesContainer.innerHTML += `<div class="px-3 py-1 rounded-full border text-sm font-bold ${colors[grade]}">${grade}: ${formatTraineeCount(count)}</div>`;
-            }
+            });
+
             drawCharts(data);
         }
 
@@ -586,9 +612,17 @@
 
                 const btn = document.createElement('button');
                 btn.className = `flex-1 text-right p-3 rounded border transition-all ${isActive ? activeClass : inactiveClass}`;
+                
+                // إضافة إيميل المدربة للمدير ليتمكن من معرفة صاحبة التقرير
+                let uploaderInfo = '';
+                if(isCurrentUserAdmin && sheet.userEmail) {
+                    uploaderInfo = `<div class="text-[10px] text-purple-600 dark:text-purple-400 font-bold mt-1">بواسطة: ${sheet.userEmail}</div>`;
+                }
+
                 btn.innerHTML = `
                     <div class="font-bold text-sm truncate" title="${sheet.courseName}">${sheet.sheetName} <span class="text-xs opacity-75 font-normal">(${cName.substring(0,12)}..)</span></div>
                     <div class="text-[10px] ${isActive ? 'text-blue-100' : 'text-gray-500'} mt-1 truncate">مدربة: ${sheet.trainerName || 'غير محدد'} | شعبة: ${sheet.section || 'غير محدد'}</div>
+                    ${uploaderInfo}
                 `;
                 btn.onclick = () => viewRecord(originalIndex);
                 wrapper.appendChild(btn);
@@ -621,10 +655,16 @@
                 options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, animation: false }
             });
 
+            // استخدام الترتيب الإجباري (GRADES_ORDER) لضمان الترتيب في الرسم البياني
+            const distData = GRADES_ORDER.map(grade => data.gradesCount[grade] || 0);
+            
             if(distChart) distChart.destroy();
             distChart = new Chart(document.getElementById('gradesDistributionChart'), {
                 type: 'bar',
-                data: { labels: Object.keys(data.gradesCount), datasets: [{ label: 'العدد', data: Object.values(data.gradesCount), backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] },
+                data: { 
+                    labels: GRADES_ORDER, 
+                    datasets: [{ label: 'العدد', data: distData, backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] 
+                },
                 options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins:{legend:{display:false}}, animation: false }
             });
 
