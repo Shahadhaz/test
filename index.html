@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام تحليل نواتج التعلم للمتدربات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: 'Tajawal', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        .card { border-radius: 0.5rem; padding: 1.5rem; transition: all 0.3s; }
+        .light .card { background: white; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .dark .card { background: #1f2937; border: 1px solid #374151; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5); }
+        
+        /* تأثير التحميل (Loader) */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        @media print {
+            .no-print, #sidebar { display: none !important; }
+            html, body { background-color: white !important; color: black !important; display: block !important; }
+            #main-content { margin: 0 !important; width: 100% !important; background: white !important; }
+            .card { background: white !important; box-shadow: none !important; border: 1px solid #e5e7eb !important; page-break-inside: avoid; margin-bottom: 20px;}
+            canvas { max-width: 100% !important; height: auto !important; }
+            #print-logo { display: block !important; max-width: 150px !important; }
+            .dark-text-reset { color: #1f2937 !important; }
+            .edit-icon { display: none !important; }
+            input { border: none !important; background: transparent !important; color: black !important; }
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100">
+
+    <div id="auth-screen" class="fixed inset-0 bg-gray-100 dark:bg-gray-900 z-50 flex items-center justify-center p-4">
+        <div class="card w-full max-w-md text-center">
+            <img src="logo.png" alt="الشعار" class="w-24 h-24 object-contain mx-auto mb-4" onerror="this.src='https://via.placeholder.com/150x150.png?text=الشعار'">
+            <h1 class="text-2xl font-bold text-blue-900 dark:text-blue-400 mb-6">تسجيل الدخول للنظام</h1>
+            
+            <input type="email" id="email-input" placeholder="البريد الإلكتروني" class="w-full mb-4 px-4 py-3 rounded border dark:bg-gray-800 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left" dir="ltr">
+            <input type="password" id="password-input" placeholder="كلمة المرور" class="w-full mb-6 px-4 py-3 rounded border dark:bg-gray-800 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left" dir="ltr">
+            
+            <p id="auth-error" class="text-red-500 text-sm mb-4 hidden"></p>
+            
+            <div class="flex gap-2">
+                <button id="login-btn" class="flex-1 bg-blue-600 text-white font-bold py-3 px-4 rounded hover:bg-blue-700 transition">تسجيل دخول</button>
+                <button id="register-btn" class="flex-1 bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded hover:bg-gray-300 transition dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">حساب جديد</button>
+            </div>
+            <div id="auth-loader" class="hidden mt-4"><div class="loader"></div></div>
+        </div>
+    </div>
+
+    <div id="app-container" class="flex w-full h-full hidden">
+        <input type="file" id="global-file-upload" accept=".xlsx, .xls, .csv" class="hidden"/>
+
+        <aside id="sidebar" class="w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full shadow-lg z-10 no-print transition-colors">
+            <div class="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col items-center relative">
+                <button onclick="logout()" class="absolute top-4 right-4 text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400">تسجيل خروج</button>
+                <img src="logo.png" alt="الشعار" class="w-20 h-20 object-contain mb-2 mt-4" onerror="this.src='https://via.placeholder.com/150x150.png?text=الشعار'">
+                <h2 class="text-lg font-bold text-blue-900 dark:text-blue-400 text-center">النظام السحابي للتحليل</h2>
+                
+                <button onclick="toggleTheme()" class="mt-3 flex items-center justify-center gap-2 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-3 py-1 rounded-full hover:bg-gray-200 transition">
+                    <span id="theme-icon">🌙 وضع داكن</span>
+                </button>
+            </div>
+            
+            <div class="p-4 flex-1 overflow-y-auto">
+                <button onclick="document.getElementById('global-file-upload').click()" class="w-full bg-blue-600 dark:bg-blue-700 text-white font-bold py-3 px-4 rounded hover:bg-blue-700 dark:hover:bg-blue-600 transition shadow-md mb-6 flex items-center justify-center gap-2">
+                    <span>➕</span> رفع ملف جديد للسحابة
+                </button>
+
+                <div class="mb-4">
+                    <input type="text" id="search-input" placeholder="🔍 ابحث في السحابة..." 
+                           class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           onkeyup="handleSearch()">
+                </div>
+
+                <div class="flex justify-between items-center mb-3">
+                    <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">الأرشيف السحابي</p>
+                    <div id="cloud-sync-icon" class="text-xs text-green-500 hidden">☁️ متزامن</div>
+                </div>
+                
+                <div id="archive-list" class="flex flex-col gap-1"></div>
+                <div id="loading-archive" class="text-center py-4"><div class="loader"></div><p class="text-xs text-gray-400 mt-2">جلب البيانات...</p></div>
+                <p class="text-sm text-gray-400 text-center mt-4 hidden" id="empty-archive">السحابة فارغة.</p>
+            </div>
+
+            <div class="p-4 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-2">
+                <button id="delete-selected-btn" onclick="deleteSelected()" class="hidden w-full text-orange-600 dark:text-orange-400 font-bold py-2 px-4 rounded border border-orange-200 dark:border-orange-900/50 hover:bg-orange-50 transition text-sm">
+                    🗑️ حذف المحدد من السحابة
+                </button>
+            </div>
+        </aside>
+
+        <main id="main-content" class="flex-1 h-full overflow-y-auto relative p-4 md:p-8 transition-colors">
+            
+            <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center">
+                <div class="text-6xl mb-4">☁️</div>
+                <h1 class="text-3xl font-bold text-blue-900 dark:text-blue-400 mb-2">النظام متصل بالسحابة بنجاح</h1>
+                <p class="text-gray-500 dark:text-gray-400 mb-8 max-w-md">جميع بياناتك محفوظة الآن بأمان في خوادم Google Firebase ولن تفقدها أبداً.</p>
+                <button onclick="document.getElementById('global-file-upload').click()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all text-lg">
+                    رفع وتحليل ملف جديد
+                </button>
+            </div>
+
+            <div id="dashboard" class="hidden">
+                <header class="flex justify-between items-start mb-6 border-b pb-6 border-gray-300 dark:border-gray-700">
+                    <div class="flex-1">
+                        <h1 class="text-3xl font-bold text-blue-900 dark:text-blue-400 dark-text-reset mb-4">تقرير الأداء ونواتج التعلم</h1>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+                            <div class="flex items-center gap-2 group">
+                                <span class="text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">المقرر:</span>
+                                <input type="text" id="course-name-input" onchange="updateField('courseName', this.value)" class="bg-transparent border-b border-dashed border-gray-400 dark:border-gray-500 text-blue-800 dark:text-blue-300 dark-text-reset font-bold px-1 py-1 focus:outline-none w-full hover:bg-gray-100 dark:hover:bg-gray-800 rounded-t">
+                            </div>
+                            <div class="flex items-center gap-2 group">
+                                <span class="text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">المدربة:</span>
+                                <input type="text" id="trainer-name-input" onchange="updateField('trainerName', this.value)" class="bg-transparent border-b border-dashed border-gray-400 dark:border-gray-500 text-blue-800 dark:text-blue-300 dark-text-reset font-bold px-1 py-1 focus:outline-none w-full hover:bg-gray-100 dark:hover:bg-gray-800 rounded-t">
+                            </div>
+                            <div class="flex items-center gap-2 group">
+                                <span class="text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">الشعبة:</span>
+                                <input type="text" id="section-input" onchange="updateField('section', this.value)" class="bg-transparent border-b border-dashed border-gray-400 dark:border-gray-500 text-blue-800 dark:text-blue-300 dark-text-reset font-bold px-1 py-1 focus:outline-none w-full hover:bg-gray-100 dark:hover:bg-gray-800 rounded-t">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-4 no-print ml-4">
+                        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow transition-all whitespace-nowrap">
+                            🖨️ طباعة التقرير
+                        </button>
+                    </div>
+                    <img src="logo.png" id="print-logo" alt="الشعار" class="hidden w-32 h-32 object-contain" onerror="this.src='https://via.placeholder.com/150x150.png?text=الشعار'">
+                </header>
+
+                <h2 id="sheet-title" class="text-2xl font-bold mb-4 text-blue-800 dark:text-blue-300 dark-text-reset border-r-4 border-blue-600 pr-2"></h2>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 text-center">
+                    <div class="card !bg-blue-50 dark:!bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">الإجمالي</h3><p id="total-students" class="text-2xl font-bold text-blue-700 dark:text-blue-400">0</p></div>
+                    <div class="card !bg-green-50 dark:!bg-green-900/20 border border-green-100 dark:border-green-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">المتوسط</h3><p id="mean-score" class="text-2xl font-bold text-green-700 dark:text-green-400">0</p></div>
+                    <div class="card !bg-purple-50 dark:!bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">الوسيط</h3><p id="median-score" class="text-2xl font-bold text-purple-700 dark:text-purple-400">0</p></div>
+                    <div class="card !bg-yellow-50 dark:!bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">أعلى درجة</h3><p id="max-score" class="text-2xl font-bold text-yellow-700 dark:text-yellow-400">0</p></div>
+                    <div class="card !bg-red-50 dark:!bg-red-900/20 border border-red-100 dark:border-red-800/50 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">أقل درجة</h3><p id="min-score" class="text-2xl font-bold text-red-700 dark:text-red-400">0</p></div>
+                    <div class="card !bg-gray-50 dark:!bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-4"><h3 class="text-gray-500 dark:text-gray-400 font-bold mb-1 text-sm">الانحراف</h3><p id="std-dev" class="text-2xl font-bold text-gray-700 dark:text-gray-300">0</p></div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="card flex flex-col justify-center items-center">
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4">معدل الاجتياز</h3>
+                        <div class="relative w-48 h-48"><canvas id="passRateChart"></canvas></div>
+                    </div>
+                    <div class="card lg:col-span-2">
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4">توزيع التقديرات</h3>
+                        <canvas id="gradesDistributionChart" style="max-height: 250px;"></canvas>
+                        <div id="grades-badges" class="flex flex-wrap justify-center gap-2 mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4 text-center">متوسط الأداء في التقييم</h3>
+                        <canvas id="assessmentRadarChart"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-1 text-center">علاقة الحضور بالدرجة النهائية</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-4 no-print">כל نقطة تمثل متدربة (مرر الماوس لرؤية الاسم)</p>
+                        <canvas id="correlationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+        // إعدادات Firebase الخاصة بك
+        const firebaseConfig = {
+            apiKey: "AIzaSyCm6BWAE6EAYA55_dKWTZYSsOyvRwbgepc",
+            authDomain: "dataanalysis-144dc.firebaseapp.com",
+            projectId: "dataanalysis-144dc",
+            storageBucket: "dataanalysis-144dc.firebasestorage.app",
+            messagingSenderId: "794501421057",
+            appId: "1:794501421057:web:a4150eef0729318bfb0800",
+            measurementId: "G-JZRWH49JYT"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // متغيرات النظام
+        let currentUser = null;
+        let sheetsData = []; 
+        let currentRecordIndex = -1;
+        let passChart, distChart, radarChart, corrChart;
+
+        // --- التحكم بالوضع الداكن ---
+        window.toggleTheme = function() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            const isDark = html.classList.contains('dark');
+            document.getElementById('theme-icon').innerText = isDark ? '☀️ وضع فاتح' : '🌙 وضع داكن';
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            if (currentRecordIndex !== -1 && sheetsData.length > 0) drawCharts(sheetsData[currentRecordIndex]); 
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').innerText = '☀️ وضع فاتح';
+        }
+
+        // --- نظام تسجيل الدخول (Auth) ---
+        const authScreen = document.getElementById('auth-screen');
+        const appContainer = document.getElementById('app-container');
+        const errorMsg = document.getElementById('auth-error');
+        const loader = document.getElementById('auth-loader');
+
+        document.getElementById('login-btn').addEventListener('click', () => handleAuth('login'));
+        document.getElementById('register-btn').addEventListener('click', () => handleAuth('register'));
+
+        async function handleAuth(action) {
+            const email = document.getElementById('email-input').value;
+            const password = document.getElementById('password-input').value;
+            if(!email || !password) { errorMsg.innerText = "يرجى إدخال البريد وكلمة المرور"; errorMsg.classList.remove('hidden'); return; }
+            
+            errorMsg.classList.add('hidden');
+            loader.classList.remove('hidden');
+            
+            try {
+                if(action === 'login') await signInWithEmailAndPassword(auth, email, password);
+                else await createUserWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                console.error(error);
+                errorMsg.innerText = "حدث خطأ: " + error.message;
+                errorMsg.classList.remove('hidden');
+            }
+            loader.classList.add('hidden');
+        }
+
+        window.logout = function() { signOut(auth); }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                authScreen.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                await loadDataFromCloud(); // جلب بيانات السحابة
+            } else {
+                currentUser = null;
+                sheetsData = [];
+                authScreen.classList.remove('hidden');
+                appContainer.classList.add('hidden');
+            }
+        });
+
+        // --- نظام قاعدة البيانات السحابية (Firestore) ---
+        async function loadDataFromCloud() {
+            document.getElementById('loading-archive').classList.remove('hidden');
+            document.getElementById('archive-list').innerHTML = '';
+            
+            try {
+                // جلب التقارير الخاصة بالمستخدم الحالي فقط
+                const q = query(collection(db, "reports"), where("userId", "==", currentUser.uid));
+                const querySnapshot = await getDocs(q);
+                
+                sheetsData = [];
+                querySnapshot.forEach((doc) => {
+                    let data = doc.data();
+                    data.id = doc.id; // نحفظ الـ ID السحابي لنتمكن من مسحه لاحقاً
+                    sheetsData.push(data);
+                });
+                
+                // ترتيب محلي (الأحدث أولاً)
+                sheetsData.sort((a,b) => b.timestamp - a.timestamp);
+                
+                document.getElementById('loading-archive').classList.add('hidden');
+                renderArchiveList();
+                if(sheetsData.length > 0) viewRecord(0);
+                
+            } catch (error) {
+                console.error("Error loading documents: ", error);
+                alert("حدث خطأ في جلب البيانات من السحابة.");
+                document.getElementById('loading-archive').classList.add('hidden');
+            }
+        }
+
+        async function saveToCloud(processedData) {
+            document.getElementById('cloud-sync-icon').innerText = '⏳ جاري الحفظ...';
+            document.getElementById('cloud-sync-icon').classList.remove('hidden');
+            
+            try {
+                // ربط التقرير بالمستخدم الحالي
+                processedData.userId = currentUser.uid;
+                processedData.timestamp = Date.now();
+                
+                const docRef = await addDoc(collection(db, "reports"), processedData);
+                processedData.id = docRef.id; // حفظ الـ ID
+                
+                sheetsData.unshift(processedData);
+                document.getElementById('cloud-sync-icon').innerText = '✅ تم الحفظ';
+                setTimeout(() => document.getElementById('cloud-sync-icon').classList.add('hidden'), 2000);
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert("فشل الحفظ في السحابة!");
+            }
+        }
+
+        window.deleteSingle = async function(index) {
+            if(!confirm("هل أنت متأكد من الحذف النهائي من السحابة؟")) return;
+            const docId = sheetsData[index].id;
+            try {
+                await deleteDoc(doc(db, "reports", docId));
+                sheetsData.splice(index, 1);
+                resetViewAfterDelete();
+            } catch (error) { alert("خطأ في الحذف: " + error.message); }
+        }
+
+        window.deleteSelected = async function() {
+            const checkboxes = document.querySelectorAll('.archive-cb:checked');
+            if(checkboxes.length === 0) return;
+            if(!confirm(`هل أنت متأكد من حذف ${checkboxes.length} تقارير من السحابة نهائياً؟`)) return;
+            
+            document.getElementById('cloud-sync-icon').innerText = '⏳ جاري الحذف...';
+            document.getElementById('cloud-sync-icon').classList.remove('hidden');
+
+            const indices = Array.from(checkboxes).map(cb => parseInt(cb.value)).sort((a, b) => b - a);
+            
+            for (let idx of indices) {
+                const docId = sheetsData[idx].id;
+                await deleteDoc(doc(db, "reports", docId));
+                sheetsData.splice(idx, 1);
+            }
+            
+            document.getElementById('cloud-sync-icon').classList.add('hidden');
+            resetViewAfterDelete();
+        }
+
+        window.updateField = async function(field, newValue) {
+            if(currentRecordIndex === -1) return;
+            const docId = sheetsData[currentRecordIndex].id;
+            const newVal = newValue.trim();
+            
+            sheetsData[currentRecordIndex][field] = newVal;
+            renderArchiveList(document.getElementById('search-input').value);
+            
+            try {
+                const reportRef = doc(db, "reports", docId);
+                await updateDoc(reportRef, { [field]: newVal });
+            } catch (error) { console.error("Error updating", error); }
+        }
+
+        // --- باقي وظائف الواجهة (الرفع، الخوارزمية، الرسم) ---
+        
+        function resetViewAfterDelete() {
+            document.getElementById('search-input').value = '';
+            window.checkSelection(); 
+            if(sheetsData.length === 0) {
+                currentRecordIndex = -1;
+                document.getElementById('dashboard').classList.add('hidden');
+                document.getElementById('welcome-screen').classList.remove('hidden');
+            } else {
+                currentRecordIndex = -1; 
+                viewRecord(0); 
+            }
+            renderArchiveList();
+        }
+
+        window.checkSelection = function() {
+            const checkboxes = document.querySelectorAll('.archive-cb:checked');
+            const delBtn = document.getElementById('delete-selected-btn');
+            if(checkboxes.length > 0) {
+                delBtn.classList.remove('hidden');
+                delBtn.innerHTML = `🗑️ حذف المحدد (${checkboxes.length})`;
+            } else {
+                delBtn.classList.add('hidden');
+            }
+        }
+
+        window.handleSearch = function() {
+            renderArchiveList(document.getElementById('search-input').value.trim());
+        }
+
+        document.getElementById('global-file-upload').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    let newProcessed = 0;
+                    
+                    for (const sheetName of workbook.SheetNames) {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const rawData = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: ""});
+                        const processedData = processSheet(rawData, sheetName);
+                        if(processedData) {
+                            processedData.uploadDate = new Date().toLocaleDateString('ar-SA');
+                            await saveToCloud(processedData); // حفظ للسحابة فوراً
+                            newProcessed++;
+                        }
+                    }
+
+                    if (newProcessed === 0) {
+                        alert("عذراً، لم يتم العثور على بيانات صالحة.");
+                    } else {
+                        document.getElementById('search-input').value = ''; 
+                        renderArchiveList();
+                        viewRecord(0);
+                    }
+                } catch (error) { alert("حدث خطأ أثناء قراءة الملف: " + error.message); }
+                document.getElementById('global-file-upload').value = ''; 
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // خوارزمية التحليل الذكية
+        function processSheet(rows, sheetName) {
+            let cols = { name: -1, final: -1, attendance: -1, participation: -1, homework: -1, quiz: -1, finalExam: -1 };
+            let courseName = "غير محدد", trainerName = "غير محدد", section = "غير محدد";
+
+            for (let i = 0; i < Math.min(rows.length, 50); i++) {
+                const row = rows[i];
+                let rowText = row.join(" ").trim();
+                
+                if(rowText.includes("اسم المقرر")) {
+                    let matchCourse = rowText.match(/اسم المقرر\s*[:\-]?\s*(.*?)(?=القسم|دبلوم|الشعبة|$)/);
+                    if(matchCourse) courseName = matchCourse[1].trim();
+                    let matchSection = rowText.match(/الشعبة\s*[:\-]?\s*(\d+)/);
+                    if(matchSection) section = matchSection[1].trim();
+                }
+                if(rowText.includes("اسم المدربة")) {
+                    let matchTrainer = rowText.match(/اسم المدربة\s*[:\-]?\s*(.*?)(?=\s\s|,|$)/);
+                    if(matchTrainer) trainerName = matchTrainer[1].trim();
+                }
+
+                row.forEach((cell, index) => {
+                    if (!cell) return;
+                    let val = String(cell).replace(/\s+/g, ' ').trim();
+                    if(val.includes("اسم المتدربة") || val.includes("اسم الطالبة")) cols.name = index;
+                    else if(val.includes("الدرجة النهائية") || val.includes("المجموع النهائي")) cols.final = index;
+                    else if(val.includes("الحضور")) cols.attendance = index;
+                    else if(val.includes("المشاركة")) cols.participation = index;
+                    else if(val.includes("واجبات")) cols.homework = index;
+                    else if(val.includes("اختبار قصير")) cols.quiz = index;
+                    else if(val.includes("اختبار نهائي") && !val.includes("الدرجة")) cols.finalExam = index;
+                });
+            }
+
+            if (cols.name === -1 || cols.final === -1) return null;
+
+            let students = [], scatterData = [], sums = { attendance: 0, participation: 0, homework: 0, quiz: 0, finalExam: 0 };
+            
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length < 2) continue;
+                
+                let name = String(row[cols.name] || "").trim();
+                if (!name || name.includes("اسم المتدربة") || name.includes("اسم الطالبة") || name.includes("المصححة")) continue;
+                
+                let finalScore = parseFloat(row[cols.final]);
+                if (isNaN(finalScore)) continue; 
+                let attScore = parseFloat(row[cols.attendance]) || 0;
+                if (finalScore === 100 && attScore === 10 && parseFloat(row[cols.finalExam]) === 60) continue;
+
+                students.push(finalScore);
+                scatterData.push({ x: attScore, y: finalScore, studentName: name });
+
+                sums.attendance += attScore;
+                sums.participation += parseFloat(row[cols.participation] || 0);
+                sums.homework += parseFloat(row[cols.homework] || 0);
+                sums.quiz += parseFloat(row[cols.quiz] || 0);
+                sums.finalExam += parseFloat(row[cols.finalExam] || 0);
+            }
+
+            if (students.length === 0) return null;
+
+            const count = students.length;
+            const max = Math.max(...students);
+            const min = Math.min(...students);
+            const mean = students.reduce((a, b) => a + b, 0) / count;
+            const sortedGrades = [...students].sort((a, b) => a - b);
+            const median = count % 2 !== 0 ? sortedGrades[Math.floor(count / 2)] : (sortedGrades[count / 2 - 1] + sortedGrades[count / 2]) / 2;
+            const variance = students.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / count;
+            const stdDev = Math.sqrt(variance);
+            const passed = students.filter(g => g >= 60).length;
+            const failed = count - passed;
+
+            let gradesCount = { 'ممتاز': 0, 'جيد جدا': 0, 'جيد': 0, 'مقبول': 0, 'راسب': 0 };
+            students.forEach(g => {
+                if (g >= 90) gradesCount['ممتاز']++;
+                else if (g >= 80) gradesCount['جيد جدا']++;
+                else if (g >= 70) gradesCount['جيد']++;
+                else if (g >= 60) gradesCount['مقبول']++;
+                else gradesCount['راسب']++;
+            });
+
+            const avgData = [
+                (sums.attendance / count) * 10, (sums.participation / count) * 10,
+                (sums.homework / count) * 10, (sums.quiz / count) * 10, (sums.finalExam / count) * (100/60)
+            ];
+
+            return { sheetName, courseName, trainerName, section, count, max, min, mean, median, stdDev, passed, failed, gradesCount, avgData, scatterData };
+        }
+
+        // واجهة المستخدم (الرسم والقوائم)
+        function formatTraineeCount(count) {
+            if (count === 0) return "0 متدربة";
+            if (count === 1) return "متدربة واحدة";
+            if (count === 2) return "متدربتان";
+            if (count >= 3 && count <= 10) return count + " متدربات";
+            return count + " متدربة";
+        }
+
+        window.viewRecord = function(index) {
+            currentRecordIndex = index;
+            renderArchiveList(document.getElementById('search-input').value); 
+            
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+
+            const data = sheetsData[index];
+            document.getElementById('course-name-input').value = data.courseName || 'غير محدد';
+            document.getElementById('trainer-name-input').value = data.trainerName || 'غير محدد';
+            document.getElementById('section-input').value = data.section || 'غير محدد';
+            document.getElementById('sheet-title').innerText = `تحليل بيانات: ${data.sheetName}`;
+            document.getElementById('total-students').innerText = data.count;
+            document.getElementById('mean-score').innerText = data.mean.toFixed(1);
+            document.getElementById('median-score').innerText = data.median.toFixed(1);
+            document.getElementById('max-score').innerText = data.max;
+            document.getElementById('min-score').innerText = data.min;
+            document.getElementById('std-dev').innerText = data.stdDev.toFixed(2);
+
+            const badgesContainer = document.getElementById('grades-badges');
+            badgesContainer.innerHTML = '';
+            const colors = { 
+                'ممتاز': 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-300', 
+                'جيد جدا': 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300 border-cyan-300', 
+                'جيد': 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-300', 
+                'مقبول': 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-300', 
+                'راسب': 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-300' 
+            };
+            for (const [grade, count] of Object.entries(data.gradesCount)) {
+                badgesContainer.innerHTML += `<div class="px-3 py-1 rounded-full border text-sm font-bold ${colors[grade]}">${grade}: ${formatTraineeCount(count)}</div>`;
+            }
+            drawCharts(data);
+        }
+
+        function renderArchiveList(searchQuery = '') {
+            const container = document.getElementById('archive-list');
+            const emptyMsg = document.getElementById('empty-archive');
+            container.innerHTML = '';
+            
+            if (sheetsData.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                window.checkSelection();
+                return;
+            }
+
+            let foundCount = 0;
+            const lowerQuery = searchQuery.toLowerCase();
+
+            sheetsData.forEach((sheet, originalIndex) => {
+                const cName = (sheet.courseName || "").toLowerCase();
+                const tName = (sheet.trainerName || "").toLowerCase();
+                const sName = (sheet.section || "").toLowerCase();
+                const shName = (sheet.sheetName || "").toLowerCase();
+
+                if (searchQuery && !shName.includes(lowerQuery) && !cName.includes(lowerQuery) && !tName.includes(lowerQuery) && !sName.includes(lowerQuery)) return; 
+                
+                foundCount++;
+                const isActive = originalIndex === currentRecordIndex;
+                const activeClass = 'bg-blue-600 text-white border-blue-700 shadow-md';
+                const inactiveClass = 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+                
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex items-stretch gap-1 mb-1';
+                wrapper.innerHTML = `<div class="flex items-center pl-2 pt-2"><input type="checkbox" class="archive-cb w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" value="${originalIndex}" onchange="checkSelection()"></div>`;
+
+                const btn = document.createElement('button');
+                btn.className = `flex-1 text-right p-3 rounded border transition-all ${isActive ? activeClass : inactiveClass}`;
+                btn.innerHTML = `
+                    <div class="font-bold text-sm truncate" title="${sheet.courseName}">${sheet.sheetName} <span class="text-xs opacity-75 font-normal">(${cName.substring(0,12)}..)</span></div>
+                    <div class="text-[10px] ${isActive ? 'text-blue-100' : 'text-gray-500'} mt-1 truncate">مدربة: ${sheet.trainerName || 'غير محدد'} | شعبة: ${sheet.section || 'غير محدد'}</div>
+                `;
+                btn.onclick = () => viewRecord(originalIndex);
+                wrapper.appendChild(btn);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'text-gray-400 hover:text-red-500 p-2 text-sm';
+                delBtn.innerHTML = '🗑️';
+                delBtn.onclick = () => deleteSingle(originalIndex);
+                wrapper.appendChild(delBtn);
+
+                container.appendChild(wrapper);
+            });
+
+            emptyMsg.classList.toggle('hidden', foundCount > 0);
+            window.checkSelection();
+        }
+
+        function drawCharts(data) {
+            Chart.defaults.font.family = "'Tajawal', sans-serif";
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#D1D5DB' : '#374151'; 
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            Chart.defaults.color = textColor;
+            Chart.defaults.scale.grid.color = gridColor;
+
+            if(passChart) passChart.destroy();
+            passChart = new Chart(document.getElementById('passRateChart'), {
+                type: 'doughnut',
+                data: { labels: ['مجتاز', 'لم يجتز'], datasets: [{ data: [data.passed, data.failed], backgroundColor: ['#10B981', '#EF4444'], borderColor: isDark ? '#1f2937' : '#ffffff' }] },
+                options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, animation: false }
+            });
+
+            if(distChart) distChart.destroy();
+            distChart = new Chart(document.getElementById('gradesDistributionChart'), {
+                type: 'bar',
+                data: { labels: Object.keys(data.gradesCount), datasets: [{ label: 'العدد', data: Object.values(data.gradesCount), backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] },
+                options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins:{legend:{display:false}}, animation: false }
+            });
+
+            if(radarChart) radarChart.destroy();
+            radarChart = new Chart(document.getElementById('assessmentRadarChart'), {
+                type: 'bar',
+                data: { labels: ['الحضور', 'المشاركة', 'الواجبات', 'الاختبار القصير', 'الاختبار النهائي'], datasets: [{ label: 'متوسط الأداء (من 100%)', data: data.avgData, backgroundColor: '#8B5CF6', borderRadius: 4 }] },
+                options: { scales: { y: { beginAtZero: true, max: 100, ticks: {color: textColor}, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins: { tooltip: { callbacks: { label: function(c) { return c.raw.toFixed(1) + '%'; } } } }, animation: false }
+            });
+
+            if(corrChart) corrChart.destroy();
+            corrChart = new Chart(document.getElementById('correlationChart'), {
+                type: 'scatter',
+                data: { datasets: [{ label: 'المتدربات', data: data.scatterData, backgroundColor: '#EC4899', pointRadius: 6, pointHoverRadius: 8 }] },
+                options: { scales: { x: { title: { display: true, text: 'الحضور (من 10)', color: textColor }, min: 0, max: 11, ticks: {color: textColor}, grid: {color: gridColor} }, y: { title: { display: true, text: 'النهائي (من 100)', color: textColor }, min: 0, max: 105, ticks: {color: textColor}, grid: {color: gridColor} } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { const p = ctx.raw; return `${p.studentName} | حضور: ${p.x}، نهائي: ${p.y}`; } } } }, animation: false }
+            });
+        }
+    </script>
+</body>
+</html>
