@@ -24,13 +24,12 @@
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto;}
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* الكود الحاسم لحل مشكلة الطباعة (طباعة صفحات متعددة براحة تامة) */
         @media print {
             @page { size: A4 portrait; margin: 10mm; }
             * { overflow: visible !important; box-shadow: none !important; }
             html, body { height: auto !important; min-height: auto !important; display: block !important; background-color: white !important; color: black !important; }
             
-            #app-container, #main-content, #dashboard { 
+            #app-container, #main-content, #dashboard, #student-comparison-view { 
                 height: auto !important; 
                 display: block !important; 
                 position: static !important; 
@@ -39,7 +38,7 @@
                 padding: 0 !important; 
             }
             
-            .no-print, #sidebar, #mobile-overlay, #export-buttons, #mobile-menu-btn, #auth-screen { display: none !important; }
+            .no-print, #sidebar, #mobile-overlay, #export-buttons, #export-buttons-comparison, #mobile-menu-btn, #mobile-menu-btn-comparison, #comparison-search-section, #auth-screen { display: none !important; }
             
             .card { 
                 page-break-inside: avoid !important; 
@@ -52,7 +51,7 @@
             canvas { max-width: 100% !important; height: auto !important; page-break-inside: avoid !important; }
             .overflow-x-auto { overflow: visible !important; }
             
-            #print-logo { display: block !important; max-width: 280px !important; height: auto !important; margin: 0 auto 30px auto !important;}
+            #print-logo, #print-logo-comparison { display: block !important; max-width: 280px !important; height: auto !important; margin: 0 auto 30px auto !important;}
             .dark-text-reset { color: #1f2937 !important; }
             .edit-icon { display: none !important; }
             input { border: none !important; background: transparent !important; color: black !important; padding: 0 !important; }
@@ -99,24 +98,31 @@
             </div>
             
             <div class="p-4 flex-1 overflow-y-auto">
+                <div class="flex border-b border-gray-200 dark:border-gray-700 mb-5">
+                    <button onclick="switchMainView('archive')" id="tab-archive" class="flex-1 py-2 text-sm font-bold border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 transition-colors">التقارير</button>
+                    <button onclick="switchMainView('comparison')" id="tab-comparison" class="flex-1 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">بحث ومقارنة</button>
+                </div>
+
                 <button onclick="document.getElementById('global-file-upload').click()" class="w-full bg-blue-600 dark:bg-blue-700 text-white font-bold py-3 px-4 rounded hover:bg-blue-700 dark:hover:bg-blue-600 transition shadow-md mb-6 flex items-center justify-center gap-2">
                     <span>➕</span> رفع ملف جديد للسحابة
                 </button>
 
-                <div class="mb-4">
-                    <input type="text" id="search-input" placeholder="🔍 ابحث في السحابة..." 
-                           class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           onkeyup="handleSearch()">
-                </div>
+                <div id="archive-section-sidebar">
+                    <div class="mb-4">
+                        <input type="text" id="search-input" placeholder="🔍 ابحث في السحابة..." 
+                               class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               onkeyup="handleSearch()">
+                    </div>
 
-                <div class="flex justify-between items-center mb-3">
-                    <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">الأرشيف السحابي</p>
-                    <div id="cloud-sync-icon" class="text-xs text-green-500 hidden">☁️ متزامن</div>
+                    <div class="flex justify-between items-center mb-3">
+                        <p class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">الأرشيف السحابي</p>
+                        <div id="cloud-sync-icon" class="text-xs text-green-500 hidden">☁️ متزامن</div>
+                    </div>
+                    
+                    <div id="archive-list" class="flex flex-col gap-1"></div>
+                    <div id="loading-archive" class="text-center py-4"><div class="loader"></div><p class="text-xs text-gray-400 mt-2">جلب البيانات...</p></div>
+                    <p class="text-sm text-gray-400 text-center mt-4 hidden" id="empty-archive">السحابة فارغة.</p>
                 </div>
-                
-                <div id="archive-list" class="flex flex-col gap-1"></div>
-                <div id="loading-archive" class="text-center py-4"><div class="loader"></div><p class="text-xs text-gray-400 mt-2">جلب البيانات...</p></div>
-                <p class="text-sm text-gray-400 text-center mt-4 hidden" id="empty-archive">السحابة فارغة.</p>
             </div>
 
             <div class="p-4 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-2">
@@ -132,7 +138,6 @@
                 <button onclick="toggleSidebar()" class="absolute top-4 right-4 md:hidden flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-blue-700 dark:text-blue-400 px-4 py-2 rounded shadow-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                     ☰ القائمة الجانبية
                 </button>
-                
                 <div class="text-6xl mb-4">☁️</div>
                 <h1 class="text-3xl font-bold text-blue-900 dark:text-blue-400 mb-2">النظام متصل بالسحابة بنجاح</h1>
                 <p class="text-gray-500 dark:text-gray-400 mb-8 max-w-md">جميع بياناتك محفوظة الآن بأمان في خوادم Google Firebase ولن تفقدها أبداً.</p>
@@ -142,7 +147,6 @@
             </div>
 
             <div id="dashboard" class="hidden">
-                
                 <div class="w-full flex justify-center mb-6">
                     <img src="logo.png" id="print-logo" alt="الشعار" class="hidden w-48 h-48 md:w-64 md:h-64 object-contain" onerror="this.src='https://via.placeholder.com/300x150.png?text=الشعار'">
                 </div>
@@ -151,12 +155,16 @@
                     <div class="flex-1 w-full">
                         <div class="flex items-center gap-3 mb-4" id="mobile-menu-btn">
                             <button onclick="toggleSidebar()" class="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded shadow-sm font-bold text-sm hover:bg-blue-100 dark:hover:bg-blue-900/50 transition">
-                                ☰ الأرشيف
+                                ☰ القائمة
                             </button>
                             <h1 class="text-2xl md:text-3xl font-bold text-blue-900 dark:text-blue-400 dark-text-reset truncate">تقرير الأداء ونواتج التعلم</h1>
                         </div>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3">
+                            <div class="flex items-center gap-2 group">
+                                <span class="text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">المستوى:</span>
+                                <input type="number" id="level-input" min="1" step="1" onchange="updateField('level', this.value)" placeholder="غير محدد" class="bg-transparent border-b border-dashed border-gray-400 dark:border-gray-500 text-blue-800 dark:text-blue-300 dark-text-reset font-bold px-1 py-1 focus:outline-none w-full hover:bg-gray-100 dark:hover:bg-gray-800 rounded-t" dir="ltr">
+                            </div>
                             <div class="flex items-center gap-2 group">
                                 <span class="text-gray-500 dark:text-gray-400 font-bold whitespace-nowrap">المقرر:</span>
                                 <input type="text" id="course-name-input" onchange="updateField('courseName', this.value)" class="bg-transparent border-b border-dashed border-gray-400 dark:border-gray-500 text-blue-800 dark:text-blue-300 dark-text-reset font-bold px-1 py-1 focus:outline-none w-full hover:bg-gray-100 dark:hover:bg-gray-800 rounded-t">
@@ -174,13 +182,13 @@
                     
                     <div id="export-buttons" class="flex flex-col sm:flex-row items-stretch gap-2 w-full xl:w-auto mt-2">
                         <button onclick="window.print()" class="bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
-                            🖨️ طباعة (متعدد الصفحات)
+                            🖨️ طباعة
                         </button>
                         <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
                             📄 تصدير PDF
                         </button>
-                        <button onclick="exportInteractiveHTML()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
-                            🌐 تصدير ملف تفاعلي
+                        <button onclick="exportToHTML()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
+                            🌐 تصدير HTML
                         </button>
                     </div>
                 </header>
@@ -210,7 +218,7 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div class="card">
-                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4 text-center">متوسط الأداء في بنود التقييم</h3>
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 dark-text-reset mb-4 text-center">متوسط الدرجات لكل بند تقييم</h3>
                         <div class="w-full overflow-x-auto"><canvas id="assessmentRadarChart" style="min-width: 300px;"></canvas></div>
                     </div>
                     <div class="card">
@@ -220,6 +228,86 @@
                     </div>
                 </div>
             </div>
+
+            <div id="student-comparison-view" class="hidden flex flex-col w-full h-full">
+                
+                <div class="w-full flex justify-center mb-6">
+                    <img src="logo.png" id="print-logo-comparison" alt="الشعار" class="hidden w-48 h-48 md:w-64 md:h-64 object-contain" onerror="this.src='https://via.placeholder.com/300x150.png?text=الشعار'">
+                </div>
+
+                <div class="flex flex-col xl:flex-row justify-between items-start mb-6 gap-4">
+                    <div class="flex items-center gap-3" id="mobile-menu-btn-comparison">
+                        <button onclick="toggleSidebar()" class="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded shadow-sm font-bold text-sm hover:bg-blue-100 dark:hover:bg-blue-900/50 transition">
+                            ☰ القائمة
+                        </button>
+                        <h1 class="text-2xl md:text-3xl font-bold text-blue-900 dark:text-blue-400">مقارنة وتتبع أداء المتدربة</h1>
+                    </div>
+                    
+                    <div id="export-buttons-comparison" class="hidden flex-col sm:flex-row items-stretch gap-2 w-full xl:w-auto">
+                        <button onclick="window.print()" class="bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
+                            🖨️ طباعة
+                        </button>
+                        <button onclick="exportComparisonToPDF()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
+                            📄 تصدير PDF
+                        </button>
+                        <button onclick="exportComparisonToHTML()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded shadow transition-all flex items-center justify-center gap-2">
+                            🌐 تصدير HTML
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="comparison-search-section" class="flex flex-col sm:flex-row gap-3 mb-8 w-full max-w-2xl bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                    <div class="relative flex-1">
+                        <input type="text" id="student-search-input" placeholder="أدخل اسم المتدربة للبحث عبر كل المستويات..." autocomplete="off" class="w-full px-4 py-3 rounded border bg-gray-50 dark:bg-gray-900 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100 font-bold" onkeyup="showSuggestions(this.value)" onkeypress="if(event.key === 'Enter') searchStudent()">
+                        
+                        <div id="search-suggestions" class="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl hidden max-h-60 overflow-y-auto mt-1 text-right top-full left-0">
+                        </div>
+                    </div>
+                    <button onclick="searchStudent()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow transition-all">بحث</button>
+                </div>
+
+                <div id="student-search-results" class="hidden flex-1 flex flex-col gap-6 pb-8 w-full">
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full">
+                        <div class="card h-fit w-full">
+                            <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 text-center">تطور الأداء عبر المستويات (الدرجة النهائية)</h3>
+                            <div class="w-full relative h-64 md:h-80"><canvas id="studentProgressionChart"></canvas></div>
+                        </div>
+                        <div class="card h-fit w-full">
+                            <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 text-center">نقاط القوة والضعف (متوسط جميع المقررات 100%)</h3>
+                            <div class="w-full relative h-64 md:h-80 flex justify-center"><canvas id="studentRadarChart"></canvas></div>
+                        </div>
+                    </div>
+                    
+                    <div class="card h-fit w-full">
+                        <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">السجل التفصيلي للمقررات والتقييمات</h3>
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                            <table class="w-full text-right border-collapse min-w-[800px]">
+                                <thead>
+                                    <tr class="bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 text-sm">
+                                        <th class="p-3 border-b dark:border-gray-600 w-1/12">المستوى</th>
+                                        <th class="p-3 border-b dark:border-gray-600 w-3/12">المقرر</th>
+                                        <th class="p-3 border-b dark:border-gray-600 text-center">الحضور</th>
+                                        <th class="p-3 border-b dark:border-gray-600 text-center">المشاركة</th>
+                                        <th class="p-3 border-b dark:border-gray-600 text-center">الواجبات</th>
+                                        <th class="p-3 border-b dark:border-gray-600 text-center">قصير</th>
+                                        <th class="p-3 border-b dark:border-gray-600 text-center text-blue-600 dark:text-blue-400 font-bold">نهائي</th>
+                                        <th class="p-3 border-b dark:border-gray-600 text-center font-bold">المجموع</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-details-tbody" class="text-gray-600 dark:text-gray-400 text-sm font-medium">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="student-not-found" class="hidden flex flex-col items-center justify-center p-12 text-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div class="text-5xl mb-4">🔍</div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">لم يتم العثور على بيانات</h3>
+                    <p class="text-gray-500 dark:text-gray-400">تأكد من كتابة اسم المتدربة بشكل صحيح، أو تأكد من رفع تقارير تحتوي على بياناتها.</p>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -251,16 +339,50 @@
         let currentRecordIndex = -1;
         let passChart, distChart, radarChart, corrChart;
 
-        // دالة الفتح والإغلاق الموحدة (جوال وكمبيوتر)
+        window.switchMainView = function(view) {
+            const tabArchive = document.getElementById('tab-archive');
+            const tabComparison = document.getElementById('tab-comparison');
+            const viewComparison = document.getElementById('student-comparison-view');
+            const dashboard = document.getElementById('dashboard');
+            const welcomeScreen = document.getElementById('welcome-screen');
+            const archiveSection = document.getElementById('archive-section-sidebar');
+
+            if(view === 'archive') {
+                tabArchive.className = "flex-1 py-2 text-sm font-bold border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 transition-colors";
+                tabComparison.className = "flex-1 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors";
+                
+                archiveSection.classList.remove('hidden');
+                viewComparison.classList.add('hidden');
+                
+                if (currentRecordIndex !== -1 && sheetsData.length > 0) {
+                    dashboard.classList.remove('hidden');
+                } else {
+                    welcomeScreen.classList.remove('hidden');
+                }
+            } else {
+                tabComparison.className = "flex-1 py-2 text-sm font-bold border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 transition-colors";
+                tabArchive.className = "flex-1 py-2 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors";
+                
+                archiveSection.classList.add('hidden');
+                dashboard.classList.add('hidden');
+                welcomeScreen.classList.add('hidden');
+                viewComparison.classList.remove('hidden');
+                
+                if(window.innerWidth < 768) {
+                    document.getElementById('sidebar').classList.add('translate-x-full');
+                    document.getElementById('sidebar').classList.remove('translate-x-0');
+                    document.getElementById('mobile-overlay').classList.add('hidden');
+                }
+            }
+        }
+
         window.toggleSidebar = function() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('mobile-overlay');
             
             if (window.innerWidth >= 768) {
-                // للكمبيوتر
                 sidebar.classList.toggle('md:hidden');
             } else {
-                // للجوال
                 if (sidebar.classList.contains('translate-x-full')) {
                     sidebar.classList.remove('translate-x-full');
                     sidebar.classList.add('translate-x-0');
@@ -279,8 +401,13 @@
             const isDark = html.classList.contains('dark');
             document.getElementById('theme-icon').innerText = isDark ? '☀️ وضع فاتح' : '🌙 وضع داكن';
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            
             if (currentRecordIndex !== -1 && sheetsData.length > 0) drawCharts(sheetsData[currentRecordIndex]); 
+            if(!document.getElementById('student-comparison-view').classList.contains('hidden') && window.studentChartInstance) {
+                searchStudent(); 
+            }
         }
+        
         if (localStorage.getItem('theme') === 'dark') {
             document.documentElement.classList.add('dark');
             document.getElementById('theme-icon').innerText = '☀️ وضع فاتح';
@@ -387,7 +514,7 @@
                 syncIcon.classList.remove('text-green-500');
                 syncIcon.classList.add('text-red-500');
                 syncIcon.innerText = '❌ فشل الحفظ';
-                alert("تم رفض الحفظ من السحابة! \nتأكد من تفعيل Firestore ونشر قواعد الأمان (Rules).");
+                alert("تم رفض الحفظ من السحابة!");
                 setTimeout(() => syncIcon.classList.add('hidden'), 4000);
             }
         }
@@ -481,6 +608,7 @@
                         const worksheet = workbook.Sheets[sheetName];
                         const rawData = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: ""});
                         const processedData = processSheet(rawData, sheetName);
+                        
                         if(processedData) {
                             processedData.uploadDate = new Date().toLocaleDateString('ar-SA');
                             await saveToCloud(processedData);
@@ -489,9 +617,10 @@
                     }
 
                     if (newProcessed === 0) {
-                        alert("عذراً، لم يتم العثور على بيانات صالحة.");
+                        alert("عذراً، لم يتم العثور على بيانات صالحة في الملف.");
                     } else {
                         document.getElementById('search-input').value = ''; 
+                        switchMainView('archive');
                         renderArchiveList();
                         viewRecord(0);
                     }
@@ -503,7 +632,7 @@
 
         function processSheet(rows, sheetName) {
             let cols = { name: -1, final: -1, attendance: -1, participation: -1, homework: -1, quiz: -1, finalExam: -1 };
-            let courseName = "غير محدد", trainerName = "غير محدد", section = "غير محدد";
+            let courseName = "غير محدد", trainerName = "غير محدد", section = "غير محدد", level = "";
 
             for (let i = 0; i < Math.min(rows.length, 50); i++) {
                 const row = rows[i];
@@ -519,6 +648,16 @@
                     let matchTrainer = rowText.match(/اسم المدربة\s*[:\-]?\s*(.*?)(?=\s\s|,|$)/);
                     if(matchTrainer) trainerName = matchTrainer[1].trim();
                 }
+                
+                if(rowText.includes("المستوى")) {
+                    let matchLevel = rowText.match(/(?:\(|)المستوى\s*[:\-]?\s*([أ-ي0-9]+)(?:\)|)/);
+                    if(matchLevel) {
+                        let lStr = matchLevel[1].trim();
+                        const levelMap = {'الاول':1, 'الأول':1, 'الثاني':2, 'الثالث':3, 'الرابع':4, 'الخامس':5, 'السادس':6, 'السابع':7, 'الثامن':8};
+                        let mappedLevel = levelMap[lStr] || lStr.replace(/\D/g, '');
+                        if (mappedLevel) level = mappedLevel.toString();
+                    }
+                }
 
                 row.forEach((cell, index) => {
                     if (!cell) return;
@@ -529,7 +668,6 @@
                     else if(val.includes("المشاركة")) cols.participation = index;
                     else if(val.includes("واجبات")) cols.homework = index;
                     else if(val.includes("اختبار قصير")) cols.quiz = index;
-                    else if(val.includes("اختبار نهائي") && !val.includes("الدرجة")) cols.finalExam = index;
                 });
             }
 
@@ -546,17 +684,36 @@
                 
                 let finalScore = parseFloat(row[cols.final]);
                 if (isNaN(finalScore)) continue; 
+                
                 let attScore = parseFloat(row[cols.attendance]) || 0;
-                if (finalScore === 100 && attScore === 10 && parseFloat(row[cols.finalExam]) === 60) continue;
+                let partScore = parseFloat(row[cols.participation]) || 0;
+                let hwScore = parseFloat(row[cols.homework]) || 0;
+                let qzScore = parseFloat(row[cols.quiz]) || 0;
+
+                let calculatedFE = Math.max(0, finalScore - (attScore + partScore + hwScore + qzScore));
+                calculatedFE = Math.round(calculatedFE * 10) / 10;
+                let feScore = calculatedFE;
+
+                if (finalScore === 100 && attScore === 10 && feScore === 60) continue; 
 
                 students.push(finalScore);
-                scatterData.push({ x: attScore, y: finalScore, studentName: name });
+                
+                scatterData.push({ 
+                    x: attScore, 
+                    y: finalScore, 
+                    studentName: name,
+                    att: attScore,
+                    part: partScore,
+                    hw: hwScore,
+                    qz: qzScore,
+                    fe: feScore
+                });
 
                 sums.attendance += attScore;
-                sums.participation += parseFloat(row[cols.participation] || 0);
-                sums.homework += parseFloat(row[cols.homework] || 0);
-                sums.quiz += parseFloat(row[cols.quiz] || 0);
-                sums.finalExam += parseFloat(row[cols.finalExam] || 0);
+                sums.participation += partScore;
+                sums.homework += hwScore;
+                sums.quiz += qzScore;
+                sums.finalExam += feScore;
             }
 
             if (students.length === 0) return null;
@@ -582,11 +739,14 @@
             });
 
             const avgData = [
-                (sums.attendance / count) * 10, (sums.participation / count) * 10,
-                (sums.homework / count) * 10, (sums.quiz / count) * 10, (sums.finalExam / count) * (100/60)
+                sums.attendance / count,
+                sums.participation / count,
+                sums.homework / count,
+                sums.quiz / count,
+                sums.finalExam / count
             ];
 
-            return { sheetName, courseName, trainerName, section, count, max, min, mean, median, stdDev, passed, failed, gradesCount, avgData, scatterData };
+            return { level, sheetName, courseName, trainerName, section, count, max, min, mean, median, stdDev, passed, failed, gradesCount, avgData, scatterData };
         }
 
         function formatTraineeCount(count) {
@@ -602,9 +762,11 @@
             renderArchiveList(document.getElementById('search-input').value); 
             
             document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('student-comparison-view').classList.add('hidden');
             document.getElementById('dashboard').classList.remove('hidden');
 
             const data = sheetsData[index];
+            document.getElementById('level-input').value = data.level || '';
             document.getElementById('course-name-input').value = data.courseName || 'غير محدد';
             document.getElementById('trainer-name-input').value = data.trainerName || 'غير محدد';
             document.getElementById('section-input').value = data.section || 'غير محدد';
@@ -633,7 +795,6 @@
 
             drawCharts(data);
             
-            // إغلاق القائمة الجانبية تلقائياً في الجوال بعد اختيار التقرير لراحة المستخدم
             if(window.innerWidth < 768) {
                 const sidebar = document.getElementById('sidebar');
                 const overlay = document.getElementById('mobile-overlay');
@@ -662,11 +823,12 @@
                 const tName = (sheet.trainerName || "").toLowerCase();
                 const sName = (sheet.section || "").toLowerCase();
                 const shName = (sheet.sheetName || "").toLowerCase();
+                const lName = (sheet.level || "").toString();
 
-                if (searchQuery && !shName.includes(lowerQuery) && !cName.includes(lowerQuery) && !tName.includes(lowerQuery) && !sName.includes(lowerQuery)) return; 
+                if (searchQuery && !shName.includes(lowerQuery) && !cName.includes(lowerQuery) && !tName.includes(lowerQuery) && !sName.includes(lowerQuery) && !lName.includes(lowerQuery)) return; 
                 
                 foundCount++;
-                const isActive = originalIndex === currentRecordIndex;
+                const isActive = (originalIndex === currentRecordIndex && !document.getElementById('dashboard').classList.contains('hidden'));
                 const activeClass = 'bg-blue-600 text-white border-blue-700 shadow-md';
                 const inactiveClass = 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
                 
@@ -684,10 +846,13 @@
 
                 btn.innerHTML = `
                     <div class="font-bold text-sm truncate" title="${sheet.courseName}">${sheet.sheetName} <span class="text-xs opacity-75 font-normal">(${cName.substring(0,12)}..)</span></div>
-                    <div class="text-[10px] ${isActive ? 'text-blue-100' : 'text-gray-500'} mt-1 truncate">مدربة: ${sheet.trainerName || 'غير محدد'} | شعبة: ${sheet.section || 'غير محدد'}</div>
+                    <div class="text-[10px] ${isActive ? 'text-blue-100' : 'text-gray-500'} mt-1 truncate">المستوى: ${sheet.level || '-'} | مدربة: ${sheet.trainerName || '-'}</div>
                     ${uploaderInfo}
                 `;
-                btn.onclick = () => viewRecord(originalIndex);
+                btn.onclick = () => {
+                    switchMainView('archive');
+                    viewRecord(originalIndex);
+                };
                 wrapper.appendChild(btn);
 
                 const delBtn = document.createElement('button');
@@ -701,6 +866,257 @@
 
             emptyMsg.classList.toggle('hidden', foundCount > 0);
             window.checkSelection();
+        }
+
+        window.studentChartInstance = null;
+        window.studentRadarChartInstance = null; 
+        window.currentComparisonData = null; 
+
+        document.addEventListener('click', function(e) {
+            const suggestions = document.getElementById('search-suggestions');
+            const input = document.getElementById('student-search-input');
+            if (suggestions && e.target !== input && !suggestions.contains(e.target)) {
+                suggestions.classList.add('hidden');
+            }
+        });
+
+        window.showSuggestions = function(query) {
+            const suggestionsBox = document.getElementById('search-suggestions');
+            query = query.trim().toLowerCase();
+            
+            if (!query) {
+                suggestionsBox.classList.add('hidden');
+                return;
+            }
+
+            let uniqueNames = new Set();
+            
+            sheetsData.forEach(sheet => {
+                if(!sheet.scatterData) return;
+                sheet.scatterData.forEach(student => {
+                    if(student.studentName && student.studentName.toLowerCase().includes(query)) {
+                        uniqueNames.add(student.studentName);
+                    }
+                });
+            });
+
+            if (uniqueNames.size === 0) {
+                suggestionsBox.innerHTML = '<div class="p-3 text-gray-500 text-sm">لا توجد نتائج مطابقة...</div>';
+                suggestionsBox.classList.remove('hidden');
+                return;
+            }
+
+            let html = '';
+            uniqueNames.forEach(name => {
+                const regex = new RegExp(`(${query})`, 'gi');
+                const highlightedName = name.replace(regex, '<span class="text-blue-600 dark:text-blue-400 font-bold">$1</span>');
+                
+                html += `
+                    <div onclick="selectSuggestion('${name}')" class="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-gray-800 dark:text-gray-200 border-b last:border-b-0 dark:border-gray-700 text-sm transition-colors text-right">
+                        ${highlightedName}
+                    </div>
+                `;
+            });
+            
+            suggestionsBox.innerHTML = html;
+            suggestionsBox.classList.remove('hidden');
+        }
+
+        window.selectSuggestion = function(name) {
+            const input = document.getElementById('student-search-input');
+            const suggestionsBox = document.getElementById('search-suggestions');
+            
+            input.value = name;
+            suggestionsBox.classList.add('hidden');
+            
+            searchStudent();
+        }
+
+        window.searchStudent = function() {
+            const query = document.getElementById('student-search-input').value.trim().toLowerCase();
+            const suggestionsBox = document.getElementById('search-suggestions');
+            if(suggestionsBox) suggestionsBox.classList.add('hidden'); 
+            
+            if(!query) return;
+
+            let foundRecords = [];
+
+            sheetsData.forEach(sheet => {
+                if(!sheet.scatterData) return;
+                sheet.scatterData.forEach(student => {
+                    if(student.studentName && student.studentName.toLowerCase().includes(query)) {
+                        foundRecords.push({
+                            level: sheet.level || '', 
+                            courseName: sheet.courseName || 'مقرر غير محدد',
+                            score: student.y,
+                            exactName: student.studentName,
+                            att: student.att !== undefined ? student.att : '-',
+                            part: student.part !== undefined ? student.part : '-',
+                            hw: student.hw !== undefined ? student.hw : '-',
+                            qz: student.qz !== undefined ? student.qz : '-',
+                            fe: student.fe !== undefined ? student.fe : '-'
+                        });
+                    }
+                });
+            });
+
+            const resContainer = document.getElementById('student-search-results');
+            const notFound = document.getElementById('student-not-found');
+            const exportBtns = document.getElementById('export-buttons-comparison');
+
+            if(foundRecords.length === 0) {
+                resContainer.classList.add('hidden');
+                notFound.classList.remove('hidden');
+                exportBtns.classList.add('hidden');
+                return;
+            }
+
+            notFound.classList.add('hidden');
+            resContainer.classList.remove('hidden');
+            exportBtns.classList.remove('hidden');
+            exportBtns.classList.add('flex');
+
+            let levelData = {};
+            foundRecords.forEach(r => {
+                let key = r.level === '' ? '0' : r.level; 
+                if(!levelData[key]) levelData[key] = { sum: 0, count: 0, courses: [] };
+                levelData[key].sum += r.score;
+                levelData[key].count += 1;
+                levelData[key].courses.push(r);
+            });
+
+            const levels = Object.keys(levelData).sort((a, b) => Number(a) - Number(b)); 
+            const avgScores = levels.map(l => (levelData[l].sum / levelData[l].count).toFixed(1));
+
+            const tbody = document.getElementById('student-details-tbody');
+            tbody.innerHTML = '';
+            levels.forEach(l => {
+                const levelLabel = l === '0' ? 'غير محدد' : l;
+                levelData[l].courses.forEach((c, index) => {
+                    tbody.innerHTML += `
+                        <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                            <td class="p-3 border-x dark:border-gray-700 font-bold ${index === 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}">${index === 0 ? levelLabel : ''}</td>
+                            <td class="p-3 border-x dark:border-gray-700">${c.courseName} <div class="text-[10px] text-gray-400">${c.exactName}</div></td>
+                            <td class="p-3 border-x dark:border-gray-700 text-center">${c.att}</td>
+                            <td class="p-3 border-x dark:border-gray-700 text-center">${c.part}</td>
+                            <td class="p-3 border-x dark:border-gray-700 text-center">${c.hw}</td>
+                            <td class="p-3 border-x dark:border-gray-700 text-center">${c.qz}</td>
+                            <td class="p-3 border-x dark:border-gray-700 text-center text-blue-600 dark:text-blue-400 font-bold">${c.fe}</td>
+                            <td class="p-3 border-x dark:border-gray-700 font-bold text-center ${c.score >= 60 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${c.score}</td>
+                        </tr>
+                    `;
+                });
+            });
+
+            Chart.defaults.font.family = "'Tajawal', sans-serif";
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#D1D5DB' : '#374151'; 
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+            const displayLevels = levels.map(l => l === '0' ? 'غير محدد' : l);
+            const ctxProgression = document.getElementById('studentProgressionChart');
+            if(window.studentChartInstance) window.studentChartInstance.destroy();
+            
+            window.studentChartInstance = new Chart(ctxProgression, {
+                type: 'line',
+                data: {
+                    labels: displayLevels,
+                    datasets: [{
+                        label: 'متوسط الأداء للمستوى (من 100)',
+                        data: avgScores,
+                        borderColor: '#3B82F6',
+                        backgroundColor: '#3B82F6', 
+                        fill: false, 
+                        tension: 0.1, 
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#3B82F6',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 100, ticks: {color: textColor, stepSize: 20}, grid: {color: gridColor} },
+                        x: { ticks: {color: textColor}, grid: {color: gridColor} }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: function(context) { return ` المتوسط: ${context.parsed.y} درجة`; } } }
+                    }
+                }
+            });
+
+            let validRecordsForRadar = foundRecords.filter(r => r.att !== '-');
+            let radarCount = validRecordsForRadar.length;
+            let radarDataArray = [0,0,0,0,0];
+            
+            if(radarCount > 0) {
+                let radarSums = { att: 0, part: 0, hw: 0, qz: 0, fe: 0 };
+                validRecordsForRadar.forEach(r => {
+                    radarSums.att += Number(r.att)||0; 
+                    radarSums.part += Number(r.part)||0; 
+                    radarSums.hw += Number(r.hw)||0; 
+                    radarSums.qz += Number(r.qz)||0; 
+                    radarSums.fe += Number(r.fe)||0;
+                });
+                
+                radarDataArray = [
+                    (radarSums.att / radarCount) * 10,
+                    (radarSums.part / radarCount) * 10,
+                    (radarSums.hw / radarCount) * 10,
+                    (radarSums.qz / radarCount) * 10,
+                    (radarSums.fe / radarCount) * (100/60)
+                ];
+            }
+
+            const ctxRadar = document.getElementById('studentRadarChart');
+            if(window.studentRadarChartInstance) window.studentRadarChartInstance.destroy();
+            
+            // تم تصحيح الخلل هنا بإضافة min و max خارج الـ ticks لضمان الدقة
+            window.studentRadarChartInstance = new Chart(ctxRadar, {
+                type: 'radar',
+                data: {
+                    labels: ['الحضور', 'المشاركة', 'الواجبات', 'اختبار قصير', 'اختبار نهائي'],
+                    datasets: [{
+                        label: 'متوسط أداء المتدربة %',
+                        data: radarDataArray,
+                        backgroundColor: 'rgba(139, 92, 246, 0.4)', 
+                        borderColor: '#8B5CF6',
+                        pointBackgroundColor: '#8B5CF6',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#8B5CF6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            min: 0,
+                            max: 100,
+                            angleLines: { color: gridColor },
+                            grid: { color: gridColor },
+                            pointLabels: { color: textColor, font: { family: "'Tajawal', sans-serif", size: 12, weight: 'bold' } },
+                            ticks: { display: false, stepSize: 20 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: function(context) { return ` المتوسط: ${context.raw.toFixed(1)}%`; } } }
+                    }
+                }
+            });
+
+            window.currentComparisonData = {
+                studentName: document.getElementById('student-search-input').value.trim(),
+                displayLevels: displayLevels,
+                avgScores: avgScores,
+                radarDataArray: radarDataArray
+            };
         }
 
         function drawCharts(data) {
@@ -730,8 +1146,18 @@
             if(radarChart) radarChart.destroy();
             radarChart = new Chart(document.getElementById('assessmentRadarChart'), {
                 type: 'bar',
-                data: { labels: ['الحضور', 'المشاركة', 'الواجبات', 'الاختبار القصير', 'الاختبار النهائي'], datasets: [{ label: 'متوسط الأداء (من 100%)', data: data.avgData, backgroundColor: '#8B5CF6', borderRadius: 4 }] },
-                options: { scales: { y: { beginAtZero: true, max: 100, ticks: {color: textColor}, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins: { tooltip: { callbacks: { label: function(c) { return c.raw.toFixed(1) + '%'; } } } }, animation: false }
+                data: { 
+                    labels: ['الحضور (10)', 'المشاركة (10)', 'الواجبات (10)', 'اختبار قصير (10)', 'الاختبار النهائي (60)'], 
+                    datasets: [{ label: 'متوسط الدرجات الفعلية', data: data.avgData, backgroundColor: '#8B5CF6', borderRadius: 4 }] 
+                },
+                options: { 
+                    scales: { 
+                        y: { beginAtZero: true, ticks: {color: textColor}, grid: {color: gridColor} }, 
+                        x: { ticks: {color: textColor}, grid: {display: false} } 
+                    }, 
+                    plugins: { tooltip: { callbacks: { label: function(c) { return c.raw.toFixed(1) + ' درجة'; } } } }, 
+                    animation: false 
+                }
             });
 
             if(corrChart) corrChart.destroy();
@@ -742,9 +1168,173 @@
             });
         }
 
-        // ============================================
-        // 1. التصدير كملف PDF باحترافية
-        // ============================================
+        // ==========================================
+        // وظائف تصدير HTML و PDF لكلا التبويبين
+        // ==========================================
+
+        function generateHTMLReport(title, contentHTML, scriptLogic) {
+            const isDark = document.documentElement.classList.contains('dark');
+            return `<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="${isDark ? 'dark' : 'light'}">
+<head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <script>tailwind.config = { darkMode: 'class' }<\/script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Tajawal', sans-serif; background-color: ${isDark ? '#111827' : '#F9FAFB'}; color: ${isDark ? '#F3F4F6' : '#1F2937'}; }
+        .card { border-radius: 0.5rem; padding: 1.5rem; background: ${isDark ? '#1f2937' : 'white'}; border: 1px solid ${isDark ? '#374151' : '#e5e7eb'}; }
+        canvas { max-height: 400px; }
+    </style>
+</head>
+<body class="p-8 max-w-7xl mx-auto">
+    ${contentHTML}
+    <script>
+        Chart.defaults.font.family = "'Tajawal', sans-serif";
+        const isDark = ${isDark};
+        const textColor = isDark ? '#D1D5DB' : '#374151'; 
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        Chart.defaults.color = textColor;
+        Chart.defaults.scale.grid.color = gridColor;
+        ${scriptLogic}
+    <\/script>
+</body>
+</html>`;
+        }
+
+        function downloadFile(filename, content) {
+            const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        window.exportToHTML = function() {
+            const data = sheetsData[currentRecordIndex];
+            const safeFileName = `تقرير_${data.courseName}_${data.sheetName}`.replace(/[\/\?<>\\:\*\|":]/g, '_');
+            
+            const dashboardClone = document.getElementById('dashboard').cloneNode(true);
+            dashboardClone.classList.remove('hidden');
+            const exportBtns = dashboardClone.querySelector('#export-buttons');
+            const menuBtn = dashboardClone.querySelector('#mobile-menu-btn');
+            if(exportBtns) exportBtns.remove();
+            if(menuBtn) menuBtn.remove();
+            
+            const inputs = dashboardClone.querySelectorAll('input');
+            inputs.forEach(input => {
+                const span = document.createElement('span');
+                span.className = "font-bold text-blue-800 dark:text-blue-300";
+                span.innerText = input.value || input.placeholder;
+                input.parentNode.replaceChild(span, input);
+            });
+
+            const scriptLogic = `
+                const data = ${JSON.stringify(data)};
+                const GRADES_ORDER = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'راسب'];
+                
+                new Chart(document.getElementById('passRateChart'), {
+                    type: 'doughnut',
+                    data: { labels: ['مجتاز', 'لم يجتز'], datasets: [{ data: [data.passed, data.failed], backgroundColor: ['#10B981', '#EF4444'], borderColor: isDark ? '#1f2937' : '#ffffff' }] },
+                    options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, maintainAspectRatio: false }
+                });
+
+                const distData = GRADES_ORDER.map(grade => data.gradesCount[grade] || 0);
+                new Chart(document.getElementById('gradesDistributionChart'), {
+                    type: 'bar',
+                    data: { labels: GRADES_ORDER, datasets: [{ label: 'العدد', data: distData, backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] },
+                    options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins:{legend:{display:false}} }
+                });
+
+                new Chart(document.getElementById('assessmentRadarChart'), {
+                    type: 'bar',
+                    data: { 
+                        labels: ['الحضور (10)', 'المشاركة (10)', 'الواجبات (10)', 'اختبار قصير (10)', 'الاختبار النهائي (60)'], 
+                        datasets: [{ label: 'متوسط الدرجات الفعلية', data: data.avgData, backgroundColor: '#8B5CF6', borderRadius: 4 }] 
+                    },
+                    options: { scales: { y: { beginAtZero: true, ticks: {color: textColor}, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins: { tooltip: { callbacks: { label: function(c) { return c.raw.toFixed(1) + ' درجة'; } } } } }
+                });
+
+                new Chart(document.getElementById('correlationChart'), {
+                    type: 'scatter',
+                    data: { datasets: [{ label: 'المتدربات', data: data.scatterData, backgroundColor: '#EC4899', pointRadius: 6, pointHoverRadius: 8 }] },
+                    options: { scales: { x: { title: { display: true, text: 'الحضور (من 10)', color: textColor }, min: 0, max: 11, ticks: {color: textColor}, grid: {color: gridColor} }, y: { title: { display: true, text: 'النهائي (من 100)', color: textColor }, min: 0, max: 105, ticks: {color: textColor}, grid: {color: gridColor} } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { const p = ctx.raw; return p.studentName + ' | حضور: ' + p.x + '، نهائي: ' + p.y; } } } } }
+                });
+            `;
+
+            const finalHTML = generateHTMLReport(safeFileName, dashboardClone.outerHTML, scriptLogic);
+            downloadFile(`${safeFileName}.html`, finalHTML);
+        }
+
+        window.exportComparisonToHTML = function() {
+            if(!window.currentComparisonData) return;
+            
+            const studentName = window.currentComparisonData.studentName || 'متدربة';
+            const safeFileName = `تقرير_مقارنة_أداء_${studentName}`.replace(/[\/\?<>\\:\*\|":]/g, '_');
+            
+            const compClone = document.getElementById('student-comparison-view').cloneNode(true);
+            compClone.classList.remove('hidden');
+            const exportBtns = compClone.querySelector('#export-buttons-comparison');
+            const menuBtn = compClone.querySelector('#mobile-menu-btn-comparison');
+            const searchSec = compClone.querySelector('#comparison-search-section');
+            
+            if(exportBtns) exportBtns.remove();
+            if(menuBtn) menuBtn.remove();
+            if(searchSec) searchSec.remove();
+            
+            const scriptLogic = `
+                const compData = ${JSON.stringify(window.currentComparisonData)};
+                
+                new Chart(document.getElementById('studentProgressionChart'), {
+                    type: 'line',
+                    data: {
+                        labels: compData.displayLevels,
+                        datasets: [{
+                            label: 'متوسط الأداء للمستوى (من 100)',
+                            data: compData.avgScores,
+                            borderColor: '#3B82F6',
+                            backgroundColor: '#3B82F6',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#3B82F6',
+                            pointBorderWidth: 2
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100, ticks: {color: textColor, stepSize: 20}, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {color: gridColor} } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return ' المتوسط: ' + context.parsed.y + ' درجة'; } } } } }
+                });
+
+                new Chart(document.getElementById('studentRadarChart'), {
+                    type: 'radar',
+                    data: {
+                        labels: ['الحضور', 'المشاركة', 'الواجبات', 'اختبار قصير', 'اختبار نهائي'],
+                        datasets: [{
+                            label: 'متوسط أداء المتدربة %',
+                            data: compData.radarDataArray,
+                            backgroundColor: 'rgba(139, 92, 246, 0.4)', 
+                            borderColor: '#8B5CF6',
+                            pointBackgroundColor: '#8B5CF6',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: '#8B5CF6'
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 100, angleLines: { color: gridColor }, grid: { color: gridColor }, pointLabels: { color: textColor, font: { family: "'Tajawal', sans-serif", size: 12, weight: 'bold' } }, ticks: { display: false, stepSize: 20 } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return ' المتوسط: ' + context.raw.toFixed(1) + '%'; } } } } }
+                });
+            `;
+
+            const finalHTML = generateHTMLReport(safeFileName, compClone.outerHTML, scriptLogic);
+            downloadFile(`${safeFileName}.html`, finalHTML);
+        }
+
         window.exportToPDF = function() {
             const element = document.getElementById('dashboard');
             const exportBtns = document.getElementById('export-buttons');
@@ -785,7 +1375,7 @@
             }, 300);
 
             function restoreUI() {
-                exportBtns.style.display = '';
+                exportBtns.style.display = 'flex';
                 if(mobileMenuBtn) mobileMenuBtn.style.display = '';
                 if(hint) hint.style.display = '';
                 printLogo.classList.remove('block');
@@ -795,131 +1385,54 @@
             }
         }
 
-        // ============================================
-        // 2. التصدير كملف تفاعلي HTML
-        // ============================================
-        window.exportInteractiveHTML = function() {
-            const data = sheetsData[currentRecordIndex];
-            const isDark = document.documentElement.classList.contains('dark');
-            const themeClass = isDark ? 'dark' : 'light';
-            const bgClass = isDark ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-800';
+        window.exportComparisonToPDF = function() {
+            const element = document.getElementById('student-comparison-view');
+            const exportBtns = document.getElementById('export-buttons-comparison');
+            const mobileMenuBtn = document.getElementById('mobile-menu-btn-comparison');
+            const searchSection = document.getElementById('comparison-search-section');
+            const printLogo = document.getElementById('print-logo-comparison');
+            const mainContent = document.getElementById('main-content');
+            
+            exportBtns.style.display = 'none';
+            if(mobileMenuBtn) mobileMenuBtn.style.display = 'none';
+            if(searchSection) searchSection.style.display = 'none';
+            printLogo.classList.remove('hidden');
+            printLogo.classList.add('block');
+            
+            const originalOverflow = mainContent.style.overflow;
+            const originalHeight = mainContent.style.height;
+            mainContent.style.overflow = 'visible';
+            mainContent.style.height = 'auto';
 
-            const statsHtml = document.getElementById('stats-section').outerHTML;
-            const badgesHtml = document.getElementById('grades-badges').innerHTML;
-            const logoSrc = document.getElementById('print-logo').src;
+            const studentName = document.getElementById('student-search-input').value.trim() || 'متدربة';
+            const safeFileName = `تقرير_مقارنة_أداء_${studentName}`.replace(/[\/\?<>\\:\*\|":]/g, '_');
+            
+            const opt = {
+                margin:       [0.4, 0.4, 0.4, 0.4],
+                filename:     `${safeFileName}.pdf`,
+                image:        { type: 'jpeg', quality: 1 },
+                html2canvas:  { scale: 2, useCORS: true, allowTaint: true, scrollY: 0 },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
 
-            const htmlContent = `<!DOCTYPE html>
-<html lang="ar" dir="rtl" class="${themeClass}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تقرير تفاعلي - ${data.sheetName}</title>
-    <script src="https://cdn.tailwindcss.com"><\/script>
-    <script>tailwind.config = { darkMode: 'class' }<\/script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Tajawal', sans-serif; }
-        .card { border-radius: 0.5rem; padding: 1.5rem; }
-        .light .card { background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .dark .card { background: #1f2937; border: 1px solid #374151; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-    </style>
-</head>
-<body class="${bgClass} p-4 md:p-8">
-    <div class="max-w-6xl mx-auto">
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b pb-6 border-gray-300 dark:border-gray-700 gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-blue-900 dark:text-blue-400 mb-2">تقرير الأداء ونواتج التعلم</h1>
-                <div class="flex flex-wrap gap-4 text-gray-600 dark:text-gray-400 font-bold mt-4">
-                    <span>المقرر: ${data.courseName}</span>
-                    <span>المدربة: ${data.trainerName}</span>
-                    <span>الشعبة: ${data.section}</span>
-                </div>
-            </div>
-            <img src="${logoSrc}" class="w-32 h-32 md:w-48 md:h-48 object-contain" onerror="this.style.display='none'">
-        </header>
+            setTimeout(() => {
+                html2pdf().set(opt).from(element).save().then(() => {
+                    restoreUI();
+                }).catch(err => {
+                    console.error('PDF Error:', err);
+                    restoreUI();
+                });
+            }, 300);
 
-        <h2 class="text-2xl font-bold mb-4 text-blue-800 dark:text-blue-300 border-r-4 border-blue-600 pr-2">تحليل بيانات: ${data.sheetName}</h2>
-
-        ${statsHtml}
-
-        <h2 class="text-xl font-bold mb-4 text-blue-800 dark:text-blue-300 border-r-4 border-blue-600 pr-2 mt-8">تحليل نواتج التعلم ومستويات المتدربات</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div class="card flex flex-col justify-center items-center">
-                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">معدل الاجتياز</h3>
-                <div class="relative w-full max-w-[200px] aspect-square"><canvas id="passRateChart"></canvas></div>
-            </div>
-            <div class="card lg:col-span-2">
-                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">توزيع التقديرات المستحقة</h3>
-                <div class="w-full overflow-x-auto"><canvas id="gradesDistributionChart" style="max-height: 250px; min-width: 400px;"></canvas></div>
-                <div class="flex flex-wrap justify-center gap-2 mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-                   ${badgesHtml}
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div class="card">
-                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 text-center">متوسط الأداء في بنود التقييم</h3>
-                <div class="w-full overflow-x-auto"><canvas id="assessmentRadarChart" style="min-width: 300px;"></canvas></div>
-            </div>
-            <div class="card">
-                <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1 text-center">علاقة الحضور بالدرجة النهائية</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-4">كل نقطة تمثل متدربة (مرر الماوس لرؤية الاسم)</p>
-                <div class="w-full overflow-x-auto"><canvas id="correlationChart" style="min-width: 300px;"></canvas></div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        const data = ${JSON.stringify(data)};
-        const GRADES_ORDER = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'راسب'];
-        
-        Chart.defaults.font.family = "'Tajawal', sans-serif";
-        const isDark = ${isDark};
-        const textColor = isDark ? '#D1D5DB' : '#374151'; 
-        const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-        Chart.defaults.color = textColor;
-        Chart.defaults.scale.grid.color = gridColor;
-
-        new Chart(document.getElementById('passRateChart'), {
-            type: 'doughnut',
-            data: { labels: ['مجتاز', 'لم يجتز'], datasets: [{ data: [data.passed, data.failed], backgroundColor: ['#10B981', '#EF4444'], borderColor: isDark ? '#1f2937' : '#ffffff' }] },
-            options: { plugins: { legend: { position: 'bottom', labels: {color: textColor} } }, maintainAspectRatio: false }
-        });
-
-        const distData = GRADES_ORDER.map(grade => data.gradesCount[grade] || 0);
-        new Chart(document.getElementById('gradesDistributionChart'), {
-            type: 'bar',
-            data: { labels: GRADES_ORDER, datasets: [{ label: 'العدد', data: distData, backgroundColor: ['#3B82F6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'], borderRadius: 4 }] },
-            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins:{legend:{display:false}} }
-        });
-
-        new Chart(document.getElementById('assessmentRadarChart'), {
-            type: 'bar',
-            data: { labels: ['الحضور', 'المشاركة', 'الواجبات', 'الاختبار القصير', 'الاختبار النهائي'], datasets: [{ label: 'متوسط الأداء (من 100%)', data: data.avgData, backgroundColor: '#8B5CF6', borderRadius: 4 }] },
-            options: { scales: { y: { beginAtZero: true, max: 100, ticks: {color: textColor}, grid: {color: gridColor} }, x: { ticks: {color: textColor}, grid: {display: false} } }, plugins: { tooltip: { callbacks: { label: function(c) { return c.raw.toFixed(1) + '%'; } } } } }
-        });
-
-        new Chart(document.getElementById('correlationChart'), {
-            type: 'scatter',
-            data: { datasets: [{ label: 'المتدربات', data: data.scatterData, backgroundColor: '#EC4899', pointRadius: 6, pointHoverRadius: 8 }] },
-            options: { scales: { x: { title: { display: true, text: 'الحضور (من 10)', color: textColor }, min: 0, max: 11, ticks: {color: textColor}, grid: {color: gridColor} }, y: { title: { display: true, text: 'النهائي (من 100)', color: textColor }, min: 0, max: 105, ticks: {color: textColor}, grid: {color: gridColor} } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { const p = ctx.raw; return \`\${p.studentName} | حضور: \${p.x}، نهائي: \${p.y}\`; } } } } }
-        });
-    <\/script>
-</body>
-</html>`;
-
-            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const safeFileName = `تقرير_${data.courseName}_${data.sheetName}`.replace(/[\/\?<>\\:\*\|":]/g, '_');
-            a.download = `${safeFileName}.html`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            function restoreUI() {
+                exportBtns.style.display = 'flex';
+                if(mobileMenuBtn) mobileMenuBtn.style.display = '';
+                if(searchSection) searchSection.style.display = '';
+                printLogo.classList.remove('block');
+                printLogo.classList.add('hidden');
+                mainContent.style.overflow = originalOverflow;
+                mainContent.style.height = originalHeight;
+            }
         }
     </script>
 </body>
