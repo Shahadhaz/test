@@ -680,7 +680,8 @@
                 if (!row || row.length < 2) continue;
                 
                 let name = String(row[cols.name] || "").trim();
-                if (!name || name.includes("اسم المتدربة") || name.includes("اسم الطالبة") || name.includes("المصححة") || name.includes("التوقيع")) continue;
+                // ✅ تم إصلاح الخلل: إضافة الكلمات (المجموع) و (العظمى) لمنع قراءة سطر الأوزان كطالبة
+                if (!name || name.includes("اسم المتدربة") || name.includes("اسم الطالبة") || name.includes("المصححة") || name.includes("التوقيع") || name.includes("المجموع") || name.includes("العظمى")) continue;
                 
                 let finalScore = parseFloat(row[cols.final]);
                 if (isNaN(finalScore)) continue; 
@@ -694,7 +695,7 @@
                 calculatedFE = Math.round(calculatedFE * 10) / 10;
                 let feScore = calculatedFE;
 
-                if (finalScore === 100 && attScore === 10 && feScore === 60) continue; 
+                // ✅ تم إزالة الشرط الخاطئ الذي يحذف الطالبات المتفوقات الحاصلات على 100
 
                 students.push(finalScore);
                 
@@ -1075,7 +1076,6 @@
             const ctxRadar = document.getElementById('studentRadarChart');
             if(window.studentRadarChartInstance) window.studentRadarChartInstance.destroy();
             
-            // تم تصحيح الخلل هنا بإضافة min و max خارج الـ ticks لضمان الدقة
             window.studentRadarChartInstance = new Chart(ctxRadar, {
                 type: 'radar',
                 data: {
@@ -1169,7 +1169,7 @@
         }
 
         // ==========================================
-        // وظائف تصدير HTML و PDF لكلا التبويبين
+        // وظائف تصدير HTML و PDF 
         // ==========================================
 
         function generateHTMLReport(title, contentHTML, scriptLogic) {
@@ -1235,6 +1235,15 @@
                 input.parentNode.replaceChild(span, input);
             });
 
+            // ✅ إضافة تنظيف الـ Canvas لكي تعمل الرسومات البيانية في الملف التفاعلي دون خلل
+            dashboardClone.querySelectorAll('canvas').forEach(c => {
+                const freshCanvas = document.createElement('canvas');
+                freshCanvas.id = c.id;
+                if (c.id === 'gradesDistributionChart') freshCanvas.style.cssText = 'max-height: 250px; min-width: 400px;';
+                else if (c.id === 'assessmentRadarChart' || c.id === 'correlationChart') freshCanvas.style.cssText = 'min-width: 300px;';
+                c.parentNode.replaceChild(freshCanvas, c);
+            });
+
             const scriptLogic = `
                 const data = ${JSON.stringify(data)};
                 const GRADES_ORDER = ['ممتاز', 'جيد جدا', 'جيد', 'مقبول', 'راسب'];
@@ -1287,6 +1296,13 @@
             if(exportBtns) exportBtns.remove();
             if(menuBtn) menuBtn.remove();
             if(searchSec) searchSec.remove();
+
+            // ✅ تنظيف الـ Canvas هنا أيضاً
+            compClone.querySelectorAll('canvas').forEach(c => {
+                const freshCanvas = document.createElement('canvas');
+                freshCanvas.id = c.id;
+                c.parentNode.replaceChild(freshCanvas, c);
+            });
             
             const scriptLogic = `
                 const compData = ${JSON.stringify(window.currentComparisonData)};
